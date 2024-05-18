@@ -12,19 +12,29 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { auth } from '../firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth, db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { useUserStore } from '../store/user';
 
 const router = useRouter();
+const userStore = useUserStore();
 const email = ref('');
 const password = ref('');
 
 const login = async () => {
     try {
-        await signInWithEmailAndPassword(auth, email.value, password.value);
-        router.push('/');
+        const userCredential = await signInWithEmailAndPassword(auth, email.value, password.value);
+        const userId = userCredential.user.uid;
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (userDoc.exists()) {
+            const userData = userDoc.data();
+            userStore.setUser(userCredential.user);
+            userStore.setUserType(userData.userType);
+            router.push('/');
+        }
     } catch (error) {
-        console.error("Error en login:", error);
+        console.error("Error iniciando sesión:", error);
     }
 };
 </script>
