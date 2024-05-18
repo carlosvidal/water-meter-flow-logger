@@ -82,7 +82,6 @@ const router = createRouter({
   history: createWebHistory(),
   routes,
 });
-
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
   if (requiresAuth) {
