@@ -50,7 +50,8 @@ const createUser = async () => {
             isActive: isActive.value
         });
 
-        router.push('/users');
+        alert(`Usuario creado con éxito. Contraseña: ${password}`);
+        // Mantener la sesión del usuario original y no cambiar la navegación
     } catch (error) {
         console.error("Error creando el usuario:", error);
     }

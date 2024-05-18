@@ -4,7 +4,6 @@ import Login from "../views/Login.vue";
 import Register from "../views/Register.vue";
 import Users from "../views/Users.vue";
 import Profile from "../views/Profile.vue";
-import CreateUser from "../views/CreateUser.vue";
 import Units from "../views/Units.vue";
 import MeterReadings from "../views/MeterReadings.vue";
 import Reports from "../views/Reports.vue";
@@ -13,6 +12,7 @@ import CreateReading from "../views/CreateReading.vue";
 
 import { auth, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { logout } from "../utils/auth";
 
 const routes = [
   { path: "/", component: Home },
@@ -27,14 +27,6 @@ const routes = [
     path: "/profile/:id",
     component: Profile,
     meta: { requiresAuth: true },
-  },
-  {
-    path: "/create-user",
-    component: CreateUser,
-    meta: {
-      requiresAuth: true,
-      allowedUserTypes: ["editor", "admin", "super-admin"],
-    },
   },
   {
     path: "/units",
@@ -76,12 +68,20 @@ const routes = [
       allowedUserTypes: ["admin", "super-admin", "editor"],
     },
   },
+  {
+    path: "/logout",
+    beforeEnter: async (to, from, next) => {
+      await logout();
+      next("/login");
+    },
+  },
 ];
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
 });
+
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
   if (requiresAuth) {
