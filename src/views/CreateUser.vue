@@ -8,8 +8,9 @@
             <select v-model="userType" required>
                 <option value="analyst">Analista</option>
                 <option value="editor">Editor</option>
-                <option value="admin">Admin</option>
-                <option value="super-admin">Super Admin</option>
+                <option value="admin">Administrador de la cuenta</option>
+                <option value="owner">Dueño de la cuenta</option>
+                <option value="superadmin">Super Administrador</option>
             </select>
             <label>
                 Activo:

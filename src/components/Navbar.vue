@@ -1,14 +1,37 @@
 <template>
-    <nav>
-        <router-link to="/">Home</router-link>
-        <router-link to="/units" v-if="isAuthenticated && (isAdmin || isSuperAdmin || isEditor)">Units</router-link>
-        <router-link to="/meter-readings" v-if="isAuthenticated && (isAdmin || isSuperAdmin || isEditor)">Meter
-            Readings</router-link>
-        <router-link to="/reports" v-if="isAuthenticated && (isAdmin || isSuperAdmin || isEditor)">Reports</router-link>
-        <router-link to="/users" v-if="isAuthenticated && (isAdmin || isSuperAdmin)">Users</router-link>
-        <button @click="handleLogout" v-if="isAuthenticated">Logout</button>
-        <router-link to="/login" v-else>Login</router-link>
-    </nav>
+    <div class="container">
+        <nav>
+            <a href="/"><img alt="Logo" src="https://via.placeholder.com/200x70?text=Logo" width="200" height="70"
+                    style="display: block; width: 200px;"></a>
+            <ul>
+                <li v-if="isAuthenticated && (isAdmin || isSuperAdmin || isEditor)">
+                    <router-link to="/">Home</router-link>
+                </li>
+                <li v-if="isAuthenticated && (isOwner || isAdmin || isSuperAdmin || isEditor)">
+                    <router-link to="/condos">Condos</router-link>
+                </li>
+                <li v-if="isAuthenticated && (isOwner || isAdmin || isSuperAdmin || isEditor)">
+                    <router-link to="/units">Units</router-link>
+                </li>
+                <li v-if="isAuthenticated && (isOwner || isAdmin || isSuperAdmin || isEditor)">
+                    <router-link to="/meter-readings">Readings</router-link>
+                </li>
+                <li v-if="isAuthenticated && (isOwner || isAdmin || isSuperAdmin || isEditor)">
+                    <router-link to="/reports">Reports</router-link>
+                </li>
+                <li v-if="isAuthenticated && (isOwner || isAdmin || isSuperAdmin)">
+                    <router-link to="/users">Users</router-link>
+                </li>
+                <li v-if="isAuthenticated">
+                    <router-link :to="`/profile/${userID}`">Profile</router-link>
+                </li>
+                <li v-if="isAuthenticated"><a @click="handleLogout">Logout</a></li>
+                <!-- <li v-else>
+                    <router-link to="/login">Login</router-link>
+                </li> -->
+            </ul>
+        </nav>
+    </div>
 </template>
 
 <script setup>
@@ -24,6 +47,8 @@ const isAuthenticated = computed(() => userStore.isAuthenticated);
 const isAdmin = computed(() => userStore.isAdmin);
 const isSuperAdmin = computed(() => userStore.isSuperAdmin);
 const isEditor = computed(() => userStore.isEditor);
+const isOwner = computed(() => userStore.isOwner);
+const userID = computed(() => userStore.currentUser?.uid);
 
 const handleLogout = async () => {
     await logout();
@@ -32,17 +57,4 @@ const handleLogout = async () => {
 };
 </script>
 
-<style>
-nav {
-    display: flex;
-    gap: 10px;
-}
-
-button {
-    background-color: red;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    cursor: pointer;
-}
-</style>
+<style></style>

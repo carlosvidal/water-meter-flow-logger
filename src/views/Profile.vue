@@ -10,7 +10,7 @@
                     <option value="analyst">Analista</option>
                     <option value="editor">Editor</option>
                     <option value="admin">Admin</option>
-                    <option value="super-admin">Super Admin</option>
+                    <option value="superadmin">Super Admin</option>
                 </select>
             </p>
             <p><strong>Activo:</strong>

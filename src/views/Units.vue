@@ -2,11 +2,24 @@
     <div>
         <h1>Unidades</h1>
         <button @click="goToCreateUnit">Crear Unidad</button>
-        <ul>
-            <li v-for="unit in units" :key="unit.id">
-                {{ unit.name }} - {{ unit.tenant.name }} - {{ unit.tenant.email }} - {{ unit.tenant.phone }}
-            </li>
-        </ul>
+        <table>
+            <thead>
+                <tr>
+                    <th>Unidad</th>
+                    <th>Arrendatario</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="unit in units" :key="unit.id">
+                    <td>{{ unit.name }}</td>
+                    <td>{{ unit.tenant.name }}</td>
+                    <td>{{ unit.tenant.email }}</td>
+                    <td>{{ unit.tenant.phone }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </template>
 

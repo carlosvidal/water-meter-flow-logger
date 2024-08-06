@@ -4,11 +4,15 @@ import Login from "../views/Login.vue";
 import Register from "../views/Register.vue";
 import Users from "../views/Users.vue";
 import Profile from "../views/Profile.vue";
+import Condos from "../views/Condos.vue";
+import Condo from "../views/Condo.vue";
 import Units from "../views/Units.vue";
 import MeterReadings from "../views/MeterReadings.vue";
 import Reports from "../views/Reports.vue";
 import CreateUnit from "../views/CreateUnit.vue";
 import CreateReading from "../views/CreateReading.vue";
+import CreateUser from "../views/CreateUser.vue";
+import CreateCondo from "@/views/CreateCondo.vue";
 
 import { auth, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -21,7 +25,10 @@ const routes = [
   {
     path: "/users",
     component: Users,
-    meta: { requiresAuth: true, allowedUserTypes: ["admin", "super-admin"] },
+    meta: {
+      requiresAuth: true,
+      allowedUserTypes: ["owner", "admin", "superadmin"],
+    },
   },
   {
     path: "/profile/:id",
@@ -29,11 +36,27 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/condos",
+    component: Condos,
+    meta: {
+      requiresAuth: true,
+      allowedUserTypes: ["owner", "admin", "superadmin", "editor"],
+    },
+  },
+  {
+    path: "/condo/:id",
+    component: Condo,
+    meta: {
+      requiresAuth: true,
+      allowedUserTypes: ["owner", "admin", "superadmin", "editor"],
+    },
+  },
+  {
     path: "/units",
     component: Units,
     meta: {
       requiresAuth: true,
-      allowedUserTypes: ["admin", "super-admin", "editor"],
+      allowedUserTypes: ["owner", "admin", "superadmin", "editor"],
     },
   },
   {
@@ -41,7 +64,7 @@ const routes = [
     component: MeterReadings,
     meta: {
       requiresAuth: true,
-      allowedUserTypes: ["admin", "super-admin", "editor"],
+      allowedUserTypes: ["owner", "admin", "superadmin", "editor"],
     },
   },
   {
@@ -49,7 +72,15 @@ const routes = [
     component: Reports,
     meta: {
       requiresAuth: true,
-      allowedUserTypes: ["admin", "super-admin", "editor"],
+      allowedUserTypes: ["owner", "admin", "superadmin", "editor"],
+    },
+  },
+  {
+    path: "/create-condo",
+    component: CreateCondo,
+    meta: {
+      requiresAuth: true,
+      allowedUserTypes: ["owner", "admin", "superadmin", "editor"],
     },
   },
   {
@@ -57,7 +88,7 @@ const routes = [
     component: CreateUnit,
     meta: {
       requiresAuth: true,
-      allowedUserTypes: ["admin", "super-admin", "editor"],
+      allowedUserTypes: ["owner", "admin", "superadmin", "editor"],
     },
   },
   {
@@ -65,7 +96,7 @@ const routes = [
     component: CreateReading,
     meta: {
       requiresAuth: true,
-      allowedUserTypes: ["admin", "super-admin", "editor"],
+      allowedUserTypes: ["owner", "admin", "superadmin", "editor"],
     },
   },
   {
@@ -73,6 +104,14 @@ const routes = [
     beforeEnter: async (to, from, next) => {
       await logout();
       next("/login");
+    },
+  },
+  {
+    path: "/create-user",
+    component: CreateUser,
+    meta: {
+      requiresAuth: true,
+      allowedUserTypes: ["owner", "admin", "superadmin"],
     },
   },
 ];
