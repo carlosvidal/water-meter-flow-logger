@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 // Configuración de Firebase (reemplaza con tus propias credenciales)
 const firebaseConfig = {
@@ -10,13 +10,14 @@ const firebaseConfig = {
   storageBucket: "TU_STORAGE_BUCKET",
   messagingSenderId: "TU_MESSAGING_SENDER_ID",
   appId: "TU_APP_ID",
+  measurementId: "TU_MEASUREMENT_ID",
 };
 
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 
 // Exportar servicios de Firebase
-const auth = getAuth(app);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-export { auth, db };
+export { db, auth };

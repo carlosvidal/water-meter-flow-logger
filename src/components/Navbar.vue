@@ -4,7 +4,7 @@
             <a href="/"><img alt="Logo" src="https://via.placeholder.com/200x70?text=Logo" width="200" height="70"
                     style="display: block; width: 200px;"></a>
             <ul>
-                <li v-if="isAuthenticated && (isAdmin || isSuperAdmin || isEditor)">
+                <li v-if="isAuthenticated">
                     <router-link to="/">Home</router-link>
                 </li>
                 <li v-if="isAuthenticated && (isOwner || isAdmin || isSuperAdmin || isEditor)">
@@ -26,16 +26,16 @@
                     <router-link :to="`/profile/${userID}`">Profile</router-link>
                 </li>
                 <li v-if="isAuthenticated"><a @click="handleLogout">Logout</a></li>
-                <!-- <li v-else>
+                <li v-else>
                     <router-link to="/login">Login</router-link>
-                </li> -->
+                </li>
             </ul>
         </nav>
     </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'; // Asegúrate de importar `computed`
+import { computed, watchEffect } from 'vue'; // Asegúrate de importar `computed`
 import { useRouter } from 'vue-router';
 import { logout } from '../utils/auth';
 import { useUserStore } from '../store/user';
@@ -53,7 +53,12 @@ const userID = computed(() => userStore.currentUser?.uid);
 const handleLogout = async () => {
     await logout();
     userStore.clearUser();
-    router.push('/login');
+    userStore.$reset();
+    watchEffect(() => {
+        if (!isAuthenticated) {
+            router.push('/login');
+        }
+    });
 };
 </script>
 

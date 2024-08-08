@@ -3,8 +3,8 @@ import { useLocalStorage } from "@vueuse/core";
 
 export const useUserStore = defineStore("user", {
   state: () => ({
-    currentUser: useLocalStorage("currentUser", ""),
-    userType: useLocalStorage("userType", ""),
+    currentUser: useLocalStorage("currentUser", null),
+    userType: useLocalStorage("userType", null),
   }),
   getters: {
     isAuthenticated: (state) => !!state.currentUser,
@@ -15,19 +15,23 @@ export const useUserStore = defineStore("user", {
     isOwner: (state) => state.userType === "owner",
   },
   actions: {
-    setUser(user) {
+    async setUser(user) {
       this.currentUser = user;
+      console.log("User set");
     },
-    setUserType(userType) {
+    async setUserType(userType) {
       this.userType = userType;
+      console.log("User type set");
     },
     clearUser() {
       this.currentUser = null;
       this.userType = null;
-      console.log("User cleared");
+
       localStorage.removeItem("currentUser");
       localStorage.removeItem("userType");
       localStorage.clear();
+
+      console.log("User cleared");
     },
   },
 });
