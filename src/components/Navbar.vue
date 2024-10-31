@@ -1,3 +1,4 @@
+<!-- src/components/Navbar.vue -->
 <template>
     <div class="container">
         <nav>
@@ -35,7 +36,7 @@
 </template>
 
 <script setup>
-import { computed, watchEffect } from 'vue'; // Asegúrate de importar `computed`
+import { computed } from 'vue'; // Removemos watchEffect
 import { useRouter } from 'vue-router';
 import { logout } from '../utils/auth';
 import { useUserStore } from '../store/user';
@@ -51,14 +52,14 @@ const isOwner = computed(() => userStore.isOwner);
 const userID = computed(() => userStore.currentUser?.uid);
 
 const handleLogout = async () => {
-    await logout();
-    userStore.clearUser();
-    userStore.$reset();
-    watchEffect(() => {
-        if (!isAuthenticated) {
-            router.push('/login');
-        }
-    });
+    try {
+        await logout();
+        await userStore.clearUser();
+        userStore.$reset();
+        router.push('/login');
+    } catch (error) {
+        console.error('Error during logout:', error);
+    }
 };
 </script>
 

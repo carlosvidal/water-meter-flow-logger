@@ -60,6 +60,14 @@ const routes = [
     },
   },
   {
+    path: "/unit/:id",
+    component: () => import("@/views/Unit.vue"),
+    meta: {
+      requiresAuth: true,
+      allowedUserTypes: ["owner", "admin", "superadmin", "editor"],
+    },
+  },
+  {
     path: "/meter-readings",
     component: MeterReadings,
     meta: {
@@ -80,7 +88,7 @@ const routes = [
     component: CreateCondo,
     meta: {
       requiresAuth: true,
-      allowedUserTypes: ["owner", "admin", "superadmin", "editor"],
+      allowedUserTypes: ["superadmin"],
     },
   },
   {
