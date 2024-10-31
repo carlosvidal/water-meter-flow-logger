@@ -4,8 +4,33 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite App</title>
-    <!-- <link rel="stylesheet" href="https://unpkg.com/mvp.css@1.15.0/mvp.css" /> -->
+    <title>Water Meter Flow Logger</title>
+    <meta
+      name="description"
+      content="Sistema de gestión de lecturas de medidores de agua"
+    />
+    <!-- Preconectar con dominios importantes -->
+    <link rel="preconnect" href="https://firebaseapp.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#4F46E5" />
+
+    <!-- OpenGraph -->
+    <meta property="og:title" content="Water Meter Flow Logger" />
+    <meta
+      property="og:description"
+      content="Sistema de gestión de lecturas de medidores de agua"
+    />
+    <meta property="og:type" content="website" />
+
+    <!-- Fuentes -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
@@ -14,5 +39,11 @@
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
+    <noscript>
+      <strong
+        >Lo sentimos, pero esta aplicación no funciona sin JavaScript
+        habilitado. Por favor habilítalo para continuar.</strong
+      >
+    </noscript>
   </body>
 </html>
