@@ -6,9 +6,44 @@ import App from "./App.vue";
 import router from "./router";
 import { auth } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { VueTelInput } from "vue-tel-input";
+import "vue-tel-input/dist/vue-tel-input.css";
+
+import "./assets/main.css"; // o './style.css' dependiendo de dónde lo hayas creado
 
 const pinia = createPinia();
 let app;
+
+// Configuración para vue-tel-input
+const vueTelInputOptions = {
+  mode: "international",
+  onlyCountries: [
+    "PE",
+    "AR",
+    "BO",
+    "CL",
+    "CO",
+    "CR",
+    "CU",
+    "DO",
+    "EC",
+    "SV",
+    "GT",
+    "HN",
+    "MX",
+    "NI",
+    "PA",
+    "PY",
+    "PR",
+    "UY",
+    "VE",
+  ],
+  preferredCountries: ["PE"],
+  validCharactersOnly: true,
+  inputOptions: {
+    placeholder: "Ingrese número de teléfono",
+  },
+};
 
 // Esperar a que Firebase Auth inicialice
 onAuthStateChanged(auth, async (user) => {
@@ -16,6 +51,7 @@ onAuthStateChanged(auth, async (user) => {
     app = createApp(App);
     app.use(pinia);
     app.use(router);
+    app.use(VueTelInput, vueTelInputOptions); // Instalar con opciones
 
     const userStore = useUserStore();
 

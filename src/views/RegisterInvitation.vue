@@ -1,54 +1,43 @@
 <!-- src/views/RegisterInvitation.vue -->
 <template>
-    <div class="max-w-md mx-auto p-6">
-        <div v-if="loading" class="text-center py-8">
-            <p class="text-gray-600">Verificando invitación...</p>
-        </div>
+    <section class="max-w-md mx-auto p-6">
+        <h1 class="text-2xl font-bold mb-6">Registro</h1>
 
-        <div v-else-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {{ error }}
-        </div>
-
-        <div v-else>
-            <h1 class="text-2xl font-bold mb-6">Completar Registro</h1>
-
-            <div class="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded mb-6">
-                <p>Has sido invitado como {{ invitationData?.role }}</p>
-                <p class="text-sm">{{ invitationData?.email }}</p>
+        <form @submit.prevent="register" class="space-y-4 bg-white shadow-md rounded-lg p-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Nombre</label>
+                <input type="text" v-model="name" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="Ingrese su nombre" />
             </div>
 
-            <form @submit.prevent="registerUser" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Nombre completo</label>
-                    <input type="text" v-model="form.name" required
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-                </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Email</label>
+                <input type="email" v-model="email" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="ejemplo@correo.com" />
+            </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Teléfono</label>
-                    <input type="tel" v-model="form.phone" required
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-                </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Contraseña</label>
+                <input type="password" v-model="password" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="********" />
+            </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Contraseña</label>
-                    <input type="password" v-model="form.password" required minlength="8"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-                </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Teléfono</label>
+                <input type="tel" v-model="phone" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="+1234567890" />
+            </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Confirmar contraseña</label>
-                    <input type="password" v-model="form.confirmPassword" required
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-                </div>
-
-                <button type="submit" :disabled="isSubmitting"
-                    class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300">
-                    {{ isSubmitting ? 'Registrando...' : 'Completar registro' }}
-                </button>
-            </form>
-        </div>
-    </div>
+            <button type="submit"
+                class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Registrarse
+            </button>
+        </form>
+    </section>
 </template>
 
 <script setup>

@@ -1,132 +1,197 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
-
-const { onRequest } = require("firebase-functions/v2/https");
-const logger = require("firebase-functions/logger");
-
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
-
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
-
-// functions/src/index.js
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+// functions/index.js
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { initializeApp } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
 const nodemailer = require("nodemailer");
 
-admin.initializeApp();
+initializeApp();
 
-// Configurar el transporte de email (reemplaza con tus credenciales)
+const db = getFirestore();
+
+// Configuración más detallada del transporte de email
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true, // usar SSL
   auth: {
-    user: functions.config().email.user,
-    pass: functions.config().email.pass,
+    type: "login", // especificar tipo de autenticación
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false, // solo para desarrollo
   },
 });
 
-// Función para generar un token de invitación
-exports.createInvitation = functions.https.onCall(async (data, context) => {
-  // Verificar que el llamador está autorizado
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
+// Función para verificar la configuración del email
+const verifyEmailConfig = async () => {
+  try {
+    const verify = await transporter.verify();
+    console.log("Configuración de email verificada:", verify);
+    return verify;
+  } catch (error) {
+    console.error("Error en configuración de email:", error);
+    console.log("Credenciales usadas:", {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS ? "********" : "no configurado",
+    });
+    throw error;
+  }
+};
+
+// Verificar configuración al inicio
+verifyEmailConfig().catch(console.error);
+
+exports.createInvitation = onCall({ maxInstances: 10 }, async (request) => {
+  console.log(
+    "Iniciando createInvitation con datos:",
+    JSON.stringify(request.data)
+  );
+
+  // Verificar autenticación
+  if (!request.auth) {
+    console.error("Usuario no autenticado");
+    throw new HttpsError(
       "unauthenticated",
-      "Usuario no autenticado"
+      "Debes estar autenticado para enviar invitaciones"
     );
   }
 
-  const { email, role, condoId, unitId = null } = data;
+  const { email, role, condoId, unitId } = request.data;
+
+  // Validar datos requeridos
+  if (!email || !role || !condoId) {
+    console.error("Datos faltantes:", { email, role, condoId });
+    throw new HttpsError(
+      "invalid-argument",
+      "Email, rol y condominio son requeridos"
+    );
+  }
 
   try {
-    // Crear un documento de invitación
-    const invitationRef = admin.firestore().collection("invitations").doc();
+    console.log("Verificando permisos para usuario:", request.auth.uid);
+
+    // Verificar permisos del usuario
+    const userDoc = await db.collection("users").doc(request.auth.uid).get();
+    if (!userDoc.exists) {
+      throw new HttpsError("not-found", "Usuario no encontrado");
+    }
+
+    const userData = userDoc.data();
+    console.log("Datos del usuario:", userData);
+
+    if (
+      !userData.userType ||
+      !["superadmin", "admin"].includes(userData.userType)
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "No tienes permisos para enviar invitaciones"
+      );
+    }
+
+    // Verificar si el condominio existe
+    const condoDoc = await db.collection("condos").doc(condoId).get();
+    if (!condoDoc.exists) {
+      throw new HttpsError("not-found", "Condominio no encontrado");
+    }
+
+    // Si es una invitación para tenant, verificar la unidad
+    if (role === "tenant" && unitId) {
+      const unitDoc = await db.collection("units").doc(unitId).get();
+      if (!unitDoc.exists) {
+        throw new HttpsError("not-found", "Unidad no encontrada");
+      }
+    }
+
+    console.log("Creando documento de invitación");
+
+    // Crear documento de invitación
+    const invitationRef = db.collection("invitations").doc();
     const token = invitationRef.id;
 
-    await invitationRef.set({
+    const invitationData = {
       email,
       role,
       condoId,
       unitId,
       token,
-      createdBy: context.auth.uid,
+      createdBy: request.auth.uid,
       status: "pending",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      expiresAt: admin.firestore.Timestamp.fromDate(
-        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 días
-      ),
-    });
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    };
 
-    // Enviar email de invitación
-    const inviteUrl = `${functions.config().app.url}/register?token=${token}`;
+    await invitationRef.set(invitationData);
+    console.log("Invitación creada con ID:", token);
+
+    // Enviar email
+    const inviteUrl = `${process.env.APP_URL}/register/invite?token=${token}`;
+    console.log("URL de invitación:", inviteUrl);
 
     const mailOptions = {
-      from: functions.config().email.from,
+      from:
+        process.env.EMAIL_FROM ||
+        '"Water Meter Flow Logger" <noreply@watermeters.com>',
       to: email,
       subject: "Invitación a Water Meter Flow Logger",
       html: `
-        <h2>Bienvenido a Water Meter Flow Logger</h2>
-        <p>Has sido invitado a unirte como ${role}.</p>
-        <p>Para completar tu registro, haz clic en el siguiente enlace:</p>
-        <a href="${inviteUrl}" style="display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:4px;">
-          Completar Registro
-        </a>
-        <p>Este enlace expirará en 7 días.</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Bienvenido a Water Meter Flow Logger</h2>
+          <p>Has sido invitado a unirte como ${role}.</p>
+          <p>Para completar tu registro, haz clic en el siguiente enlace:</p>
+          <a href="${inviteUrl}" style="display: inline-block; padding: 12px 24px; background: #4F46E5; color: white; text-decoration: none; border-radius: 4px; margin: 20px 0;">
+            Completar Registro
+          </a>
+          <p>Este enlace expirará en 7 días.</p>
+          <p><small>Si no esperabas esta invitación, puedes ignorar este email.</small></p>
+        </div>
       `,
     };
 
-    await transporter.sendMail(mailOptions);
+    console.log(
+      "Intentando enviar email con opciones:",
+      JSON.stringify(mailOptions)
+    );
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log("Email enviado:", info);
+    } catch (emailError) {
+      console.error("Error enviando email:", emailError);
+      await invitationRef.update({
+        emailError: emailError.message,
+      });
+    }
 
     return { success: true, token };
   } catch (error) {
-    console.error("Error creating invitation:", error);
-    throw new functions.https.HttpsError(
+    console.error("Error en createInvitation:", error);
+    throw new HttpsError(
       "internal",
-      "Error al crear la invitación"
+      `Error al crear la invitación: ${error.message}`
     );
   }
 });
 
-// Función para verificar y procesar un token de invitación
-exports.verifyInvitation = functions.https.onCall(async (data, context) => {
-  const { token } = data;
+exports.verifyInvitation = onCall({ maxInstances: 10 }, async (request) => {
+  const { token } = request.data;
 
   try {
-    const invitationRef = admin
-      .firestore()
-      .collection("invitations")
-      .doc(token);
-    const invitation = await invitationRef.get();
+    const invitationRef = await db.collection("invitations").doc(token).get();
 
-    if (!invitation.exists) {
-      throw new functions.https.HttpsError(
-        "not-found",
-        "Invitación no encontrada"
-      );
+    if (!invitationRef.exists) {
+      throw new HttpsError("not-found", "Invitación no encontrada");
     }
 
-    const invitationData = invitation.data();
+    const invitationData = invitationRef.data();
 
     if (invitationData.status !== "pending") {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "Invitación ya utilizada"
-      );
+      throw new HttpsError("failed-precondition", "Invitación ya utilizada");
     }
 
     if (invitationData.expiresAt.toDate() < new Date()) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "Invitación expirada"
-      );
+      throw new HttpsError("failed-precondition", "Invitación expirada");
     }
 
     return {
@@ -140,85 +205,9 @@ exports.verifyInvitation = functions.https.onCall(async (data, context) => {
     };
   } catch (error) {
     console.error("Error verifying invitation:", error);
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       "internal",
-      "Error al verificar la invitación"
+      `Error al verificar la invitación: ${error.message}`
     );
   }
 });
-
-// src/services/invitationService.js
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { db } from "../firebase";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  updateDoc,
-  doc,
-  serverTimestamp,
-} from "firebase/firestore";
-
-const functions = getFunctions();
-
-export const invitationService = {
-  // Enviar invitación
-  async sendInvitation(email, role, condoId, unitId = null) {
-    try {
-      const createInvitation = httpsCallable(functions, "createInvitation");
-      const result = await createInvitation({ email, role, condoId, unitId });
-      return result.data;
-    } catch (error) {
-      console.error("Error sending invitation:", error);
-      throw error;
-    }
-  },
-
-  // Verificar token de invitación
-  async verifyInvitation(token) {
-    try {
-      const verifyInvitation = httpsCallable(functions, "verifyInvitation");
-      const result = await verifyInvitation({ token });
-      return result.data;
-    } catch (error) {
-      console.error("Error verifying invitation:", error);
-      throw error;
-    }
-  },
-
-  // Obtener invitaciones pendientes por condominio
-  async getPendingInvitations(condoId) {
-    try {
-      const invitationsRef = collection(db, "invitations");
-      const q = query(
-        invitationsRef,
-        where("condoId", "==", condoId),
-        where("status", "==", "pending")
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-    } catch (error) {
-      console.error("Error getting pending invitations:", error);
-      throw error;
-    }
-  },
-
-  // Cancelar una invitación
-  async cancelInvitation(invitationId) {
-    try {
-      const invitationRef = doc(db, "invitations", invitationId);
-      await updateDoc(invitationRef, {
-        status: "cancelled",
-        updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error("Error cancelling invitation:", error);
-      throw error;
-    }
-  },
-};

@@ -1,28 +1,41 @@
 <!-- src/views/Login.vue -->
 <template>
     <section class="max-w-md mx-auto p-6">
-        <h1 class="text-2xl font-bold mb-6">Login</h1>
+        <h1 class="text-2xl font-bold mb-6">Iniciar Sesión</h1>
 
         <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {{ error }}
         </div>
 
-        <form @submit.prevent="login" class="space-y-4">
+        <form @submit.prevent="login" class="space-y-4 bg-white shadow-md rounded-lg p-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700">Email</label>
                 <input type="email" v-model="email" required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="ejemplo@correo.com" />
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700">Password</label>
+                <label class="block text-sm font-medium text-gray-700">Contraseña</label>
                 <input type="password" v-model="password" required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="********" />
             </div>
 
             <button type="submit" :disabled="loading"
                 class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300">
-                {{ loading ? 'Iniciando sesión...' : 'Iniciar Sesión' }}
+                <span v-if="loading" class="inline-flex items-center">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg"
+                        fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                        </circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                    Iniciando sesión...
+                </span>
+                <span v-else>Iniciar Sesión</span>
             </button>
         </form>
     </section>

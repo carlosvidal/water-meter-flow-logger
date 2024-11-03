@@ -13,6 +13,7 @@ import CreateUnit from "../views/CreateUnit.vue";
 import CreateReading from "../views/CreateReading.vue";
 import CreateUser from "../views/CreateUser.vue";
 import CreateCondo from "@/views/CreateCondo.vue";
+import RegisterInvitation from "../views/RegisterInvitation.vue";
 
 import { auth, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -120,6 +121,20 @@ const routes = [
     meta: {
       requiresAuth: true,
       allowedUserTypes: ["owner", "admin", "superadmin"],
+    },
+  },
+  {
+    path: "/register/invite",
+    component: RegisterInvitation,
+    // No requiere autenticación porque es para usuarios nuevos
+    meta: { requiresAuth: false },
+  },
+  {
+    path: "/test-invitation",
+    component: () => import("../views/TestInvitation.vue"),
+    meta: {
+      requiresAuth: true,
+      allowedUserTypes: ["superadmin", "admin"],
     },
   },
 ];

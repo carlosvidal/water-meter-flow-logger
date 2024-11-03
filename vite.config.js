@@ -1,11 +1,17 @@
 import { fileURLToPath, URL } from "node:url";
-
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import tailwindcss from "tailwindcss";
+import autoprefixer from "autoprefixer";
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  css: {
+    postcss: {
+      plugins: [tailwindcss, autoprefixer],
+    },
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
@@ -14,11 +20,11 @@ export default defineConfig({
   build: {
     outDir: "dist",
     assetsDir: "assets",
-    sourcemap: false, // Cambiar a true si necesitas debugear en producción
+    sourcemap: false,
     minify: "terser",
     terserOptions: {
       compress: {
-        drop_console: true, // Elimina console.log en producción
+        drop_console: true,
         drop_debugger: true,
       },
     },
