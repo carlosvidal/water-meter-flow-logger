@@ -10,7 +10,7 @@ import Units from "../views/Units.vue";
 import MeterReadings from "../views/MeterReadings.vue";
 import Reports from "../views/Reports.vue";
 import CreateUnit from "../views/CreateUnit.vue";
-import CreateReading from "../views/CreateReading.vue";
+import CreateMeterReading from "../views/CreateMeterReading.vue";
 import CreateUser from "../views/CreateUser.vue";
 import CreateCondo from "@/views/CreateCondo.vue";
 import RegisterInvitation from "../views/RegisterInvitation.vue";
@@ -69,6 +69,14 @@ const routes = [
     },
   },
   {
+    path: "/unit/:id/edit",
+    component: () => import("@/views/UnitEdit.vue"),
+    meta: {
+      requiresAuth: true,
+      allowedUserTypes: ["owner", "admin", "superadmin", "editor"],
+    },
+  },
+  {
     path: "/meter-readings",
     component: MeterReadings,
     meta: {
@@ -102,7 +110,7 @@ const routes = [
   },
   {
     path: "/create-reading",
-    component: CreateReading,
+    component: CreateMeterReading,
     meta: {
       requiresAuth: true,
       allowedUserTypes: ["owner", "admin", "superadmin", "editor"],

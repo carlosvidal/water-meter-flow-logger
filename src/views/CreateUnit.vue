@@ -73,7 +73,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { db } from '../firebase';
-import { collection, addDoc, doc, getDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, updateDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
 
 // Router setup
@@ -145,6 +145,7 @@ const createUnit = async () => {
             throw new Error('Por favor complete todos los campos correctamente');
         }
 
+        // Crear la unidad en la colección units
         const unitData = {
             condoId,
             name: name.value.trim(),
@@ -158,9 +159,17 @@ const createUnit = async () => {
             updatedAt: serverTimestamp()
         };
 
-        console.log('Creating unit with data:', unitData);
+        const unitRef = await addDoc(collection(db, 'units'), unitData);
 
-        await addDoc(collection(db, 'units'), unitData);
+        // Actualizar el documento del condominio con la nueva referencia
+        const condoRef = doc(db, 'condos', condoId);
+        await updateDoc(condoRef, {
+            [`units.${unitRef.id}`]: {
+                createdAt: serverTimestamp()
+            },
+            updatedAt: serverTimestamp()
+        });
+
         router.push(`/condo/${condoId}`);
     } catch (err) {
         console.error("Error creando la unidad:", err);

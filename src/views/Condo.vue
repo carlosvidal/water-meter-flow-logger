@@ -7,7 +7,7 @@
                 <div>
                     <h1 class="text-2xl font-bold">{{ condo.name }}</h1>
                     <p class="text-gray-600">
-                        Unidades: {{ units.length }} / {{ condo.numberOfUnits }}
+                        Unidades: {{ Object.keys(condo.units || {}).length }} / {{ condo.numberOfUnits }}
                     </p>
                 </div>
                 <div class="flex items-center space-x-4">
@@ -23,11 +23,12 @@
             </div>
 
             <!-- Lista de unidades -->
-            <!-- Lista de unidades -->
             <div class="bg-white shadow rounded-lg overflow-hidden">
                 <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
                     <h2 class="text-lg font-medium">Unidades</h2>
-                    <span class="text-sm text-gray-500">Total: {{ units.length }} / {{ condo.numberOfUnits }}</span>
+                    <span class="text-sm text-gray-500">
+                        Total: {{ Object.keys(condo.units || {}).length }} / {{ condo.numberOfUnits }}
+                    </span>
                 </div>
                 <div class="border-t border-gray-200">
                     <div class="overflow-x-auto">
@@ -57,7 +58,7 @@
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
-                                <tr v-for="unit in units" :key="unit.id" class="hover:bg-gray-50">
+                                <tr v-for="unit in sortedUnits" :key="unit.id" class="hover:bg-gray-50">
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <router-link :to="`/unit/${unit.id}`"
                                             class="text-blue-600 hover:text-blue-800 font-medium">
@@ -79,17 +80,10 @@
                                         </a>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <span :class="`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${unit.isActive
-                                                ? 'bg-green-100 text-green-800'
-                                                : 'bg-red-100 text-red-800'
+                                        <span :class="`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${unit.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                                             }`">
                                             {{ unit.isActive ? 'Activo' : 'Inactivo' }}
                                         </span>
-                                    </td>
-                                </tr>
-                                <tr v-if="units.length === 0">
-                                    <td colspan="5" class="px-6 py-4 whitespace-nowrap text-center text-gray-500">
-                                        No hay unidades registradas
                                     </td>
                                 </tr>
                             </tbody>
@@ -114,18 +108,29 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { db } from '../firebase';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 
 const route = useRoute();
 const router = useRouter();
 const condoId = route.params.id;
 const condo = ref(null);
-const units = ref([]);
+const unitsDetails = ref({});
 const isActive = ref(false);
 
-// Computed property para controlar si se pueden añadir más unidades
+// Computed property para ordenar las unidades
+const sortedUnits = computed(() => {
+    if (!condo.value?.units || !unitsDetails.value) return [];
+
+    return Object.entries(unitsDetails.value)
+        .map(([id, unit]) => ({
+            id,
+            ...unit
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+});
+
 const canAddUnits = computed(() => {
-    return condo.value && units.value.length < condo.value.numberOfUnits;
+    return condo.value && Object.keys(condo.value.units || {}).length < condo.value.numberOfUnits;
 });
 
 const fetchCondo = async () => {
@@ -135,7 +140,11 @@ const fetchCondo = async () => {
         if (docSnap.exists()) {
             condo.value = { id: docSnap.id, ...docSnap.data() };
             isActive.value = condo.value.isActive;
-            await fetchUnits();
+
+            // Si hay unidades, obtener sus detalles
+            if (condo.value.units) {
+                await fetchUnitsDetails();
+            }
         } else {
             console.log("No se encontró el condominio.");
         }
@@ -144,19 +153,25 @@ const fetchCondo = async () => {
     }
 };
 
-const fetchUnits = async () => {
+const fetchUnitsDetails = async () => {
     try {
+        const unitIds = Object.keys(condo.value.units || {});
+        if (unitIds.length === 0) return;
+
         const unitsQuery = query(
             collection(db, 'units'),
             where('condoId', '==', condoId)
         );
         const querySnapshot = await getDocs(unitsQuery);
-        units.value = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
+
+        const unitsData = {};
+        querySnapshot.forEach(doc => {
+            unitsData[doc.id] = doc.data();
+        });
+
+        unitsDetails.value = unitsData;
     } catch (error) {
-        console.error("Error fetching units:", error);
+        console.error("Error fetching units details:", error);
     }
 };
 
