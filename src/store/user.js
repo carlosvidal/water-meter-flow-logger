@@ -7,16 +7,16 @@ import { db } from "../firebase";
 export const useUserStore = defineStore("user", () => {
   // Estado
   const currentUser = ref(null);
-  const userType = ref(null);
+  const baseRole = ref(null);
   const userData = ref(null);
 
   // Getters
   const isAuthenticated = computed(() => !!currentUser.value);
-  const isAdmin = computed(() => userType.value === "admin");
-  const isSuperAdmin = computed(() => userType.value === "superadmin");
-  const isEditor = computed(() => userType.value === "editor");
-  const isOwner = computed(() => userType.value === "owner");
-  const isAnalyst = computed(() => userType.value === "analyst");
+  const isAdmin = computed(() => baseRole.value === "admin");
+  const isSuperAdmin = computed(() => baseRole.value === "superadmin");
+  const isEditor = computed(() => baseRole.value === "editor");
+  const isOwner = computed(() => baseRole.value === "owner");
+  const isAnalyst = computed(() => baseRole.value === "analyst");
 
   // Acciones
   async function setUser(user) {
@@ -28,7 +28,7 @@ export const useUserStore = defineStore("user", () => {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
           userData.value = userDoc.data();
-          userType.value = userData.value.userType;
+          baseRole.value = userData.value.baseRole;
           console.log("User data loaded:", userData.value);
         } else {
           console.warn("No user document found in Firestore");
@@ -43,23 +43,15 @@ export const useUserStore = defineStore("user", () => {
   async function clearUser() {
     console.log("Clearing user store");
     currentUser.value = null;
-    userType.value = null;
+    baseRole.value = null;
     userData.value = null;
-
-    // Asegurarnos de que todas las referencias al usuario se limpien
-    localStorage.removeItem("user"); // Si estás usando localStorage
-  }
-
-  // Para mantener compatibilidad con el código existente
-  function setUserType(type) {
-    console.log("Setting user type:", type);
-    userType.value = type;
+    localStorage.removeItem("user");
   }
 
   return {
     // Estado
     currentUser,
-    userType,
+    baseRole,
     userData,
 
     // Getters
@@ -73,6 +65,5 @@ export const useUserStore = defineStore("user", () => {
     // Acciones
     setUser,
     clearUser,
-    setUserType, // Mantener para compatibilidad
   };
 });

@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Funciones helper para verificar roles y permisos
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isUserActive() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isActive == true;
+    }
+    function isSuperAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.baseRole == 'superadmin';
+    }
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.baseRole == 'admin';
+    }
+    function isEditor() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.baseRole == 'editor';
+    }
+    // Verifica si el usuario es admin de un condominio específico
+    function isCondoAdmin(condoId) {
+      return exists(/databases/$(database)/documents/userRoles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/userRoles/$(request.auth.uid)).data.role == 'admin'
+        && get(/databases/$(database)/documents/userRoles/$(request.auth.uid)).data.condoId == condoId;
+    }
+    // Verifica si el usuario tiene permiso para gestionar lecturas
+    function canManageReadings() {
+      return isAuthenticated() && (isSuperAdmin() || isAdmin() || isEditor());
+    }
+    // Reglas para la colección meter-readings
+    match /meter-readings/{readingId} {
+      allow read: if isAuthenticated();
+      allow create, update: if canManageReadings();
+      allow delete: if isSuperAdmin();
+    }
+    // Reglas para la colección unit-readings
+    match /unit-readings/{readingId} {
+      allow read: if isAuthenticated();
+      allow create, update: if canManageReadings();
+      allow delete: if isSuperAdmin();
+    }
+    // Reglas para la colección users
+    match /users/{userId} {
+      // Funciones helper para roles administrativos
+      function isAdmin() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.baseRole == 'admin';
+      }
+      
+      function isSuperAdmin() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.baseRole == 'superadmin';
+      }
+      
+      // Los superadmin pueden leer y escribir todos los usuarios
+      // Los admin pueden leer todos los usuarios pero solo modificar usuarios que no sean admin o superadmin
+      // Los usuarios normales solo pueden leer y actualizar su propio perfil
+      allow read: if request.auth != null && (
+        isSuperAdmin() || 
+        isAdmin() || 
+        request.auth.uid == userId
+      );
+      
+      allow write: if request.auth != null && (
+        isSuperAdmin() || 
+        (isAdmin() && !exists(/databases/$(database)/documents/users/$(userId)).data.baseRole in ['admin', 'superadmin']) ||
+        request.auth.uid == userId
+      );
+    }
+    // Reglas para la colección condos
+    match /condos/{condoId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || isCondoAdmin(condoId);
+    }
+    // Reglas para la colección units
+    match /units/{unitId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || isCondoAdmin(resource.data.condoId);
+    }
+  }
+}

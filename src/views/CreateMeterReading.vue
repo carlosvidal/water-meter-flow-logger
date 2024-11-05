@@ -1,6 +1,9 @@
 <!-- src/views/CreateMeterReading.vue -->
 <template>
     <div class="max-w-4xl mx-auto p-4 space-y-6">
+
+        <h1 class="text-2xl font-bold">{{ pageTitle }}</h1>
+
         <!-- Loading state -->
         <div v-if="loading" class="text-center py-4">
             <p class="text-gray-600">Cargando...</p>
@@ -33,38 +36,44 @@
         <template v-if="selectedCondoId">
             <!-- Lectura Principal -->
             <div class="bg-white shadow rounded-lg p-6">
-                <h2 class="text-xl font-semibold mb-4">Lectura de Medidor Principal</h2>
+                <h2 class="text-xl font-semibold mb-4">
+                    {{ isFirstReading ? 'Lectura Base' : 'Lectura de Medidor Principal' }}
+                </h2>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-sm font-medium mb-1">Fecha de Lectura</label>
                         <input type="date" v-model="mainReading.date" required
                             class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" />
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Lectura (m³)</label>
-                        <input type="number" v-model="mainReading.reading"
-                            class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="0" step="1" min="0" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Costo Total</label>
-                        <input type="number" v-model="mainReading.cost"
-                            class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="0" step="1" min="0" />
-                    </div>
+                    <!-- Solo mostrar estos campos si no es la primera lectura -->
+                    <template v-if="!isFirstReading">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Lectura (m³)</label>
+                            <input type="number" v-model="mainReading.reading"
+                                class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="0" step="1" min="0" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Costo Total</label>
+                            <input type="number" v-model="mainReading.cost"
+                                class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="0" step="1" min="0" />
+                        </div>
+                    </template>
                 </div>
-                <!-- Botón para crear/actualizar lectura principal -->
-                <div class="mt-4 flex justify-end">
-                    <button @click="saveMainReading" :disabled="!canSaveMainReading || loading"
-                        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300">
-                        {{ loading ? 'Guardando...' : mainReadingId ? 'Actualizar Lectura' : 'Crear Lectura' }}
-                    </button>
+
+                <!-- Mensaje informativo para primera lectura -->
+                <div v-if="isFirstReading" class="mt-4 text-sm text-gray-600">
+                    Esta es la lectura base del condominio. Solo necesita ingresar la fecha y las lecturas iniciales de
+                    cada unidad.
                 </div>
             </div>
 
-            <!-- Lecturas Individuales -->
-            <div v-if="mainReadingId" class="bg-white shadow rounded-lg p-6">
-                <h2 class="text-xl font-semibold mb-4">Lecturas Individuales</h2>
+            <!-- Lecturas Individuales - Modificar esta sección -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">
+                    {{ isFirstReading ? 'Lecturas Iniciales' : 'Lecturas Individuales' }}
+                </h2>
                 <div v-if="loading" class="text-center py-4">
                     <p class="text-gray-600">Cargando unidades...</p>
                 </div>
@@ -77,26 +86,18 @@
                         <div class="md:col-span-2">
                             <span class="font-medium">{{ unit.name }}</span>
                             <p class="text-sm text-gray-500">{{ unit.tenant?.name }}</p>
-                            <p v-if="previousReadings[unit.id]" class="text-xs text-gray-500">
+                            <p v-if="!isFirstReading && previousReadings[unit.id]" class="text-xs text-gray-500">
                                 Lectura anterior: {{ previousReadings[unit.id] }} m³
                             </p>
                         </div>
                         <div>
-                            <input type="number" v-model="unitReadings[unit.id]" @change="saveUnitReading(unit.id)"
+                            <input type="number" v-model="unitReadings[unit.id]"
                                 class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" step="1"
                                 min="0"
-                                :placeholder="previousReadings[unit.id] ? `>${previousReadings[unit.id]}` : '0'" />
+                                :placeholder="isFirstReading ? 'Ingrese lectura inicial' : (previousReadings[unit.id] ? `>${previousReadings[unit.id]}` : '0')" />
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Mensajes de Estado -->
-            <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-                {{ error }}
-            </div>
-            <div v-if="success" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
-                {{ success }}
             </div>
 
             <!-- Botones de Acción -->
@@ -105,12 +106,22 @@
                     class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500">
                     Cancelar
                 </button>
-                <button @click="closeReading" :disabled="!canClose || loading" :class="[
-                    'px-4 py-2 text-white rounded focus:outline-none focus:ring-2',
-                    canClose && !loading ? 'bg-green-600 hover:bg-green-700' : 'bg-green-300 cursor-not-allowed'
-                ]">
-                    {{ loading ? 'Guardando...' : 'Cerrar Lectura' }}
+                <button v-if="isFirstReading" @click="saveMainReading" :disabled="!canSaveMainReading || loading"
+                    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300">
+                    {{ loading ? 'Guardando...' : 'Guardar Lectura Base' }}
                 </button>
+                <template v-else>
+                    <button @click="saveMainReading" :disabled="!canSaveMainReading || loading"
+                        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300">
+                        {{ loading ? 'Guardando...' : mainReadingId ? 'Actualizar Lectura' : 'Crear Lectura' }}
+                    </button>
+                    <button v-if="mainReadingId" @click="closeReading" :disabled="!canClose || loading" :class="[
+                        'px-4 py-2 text-white rounded focus:outline-none focus:ring-2',
+                        canClose && !loading ? 'bg-green-600 hover:bg-green-700' : 'bg-green-300 cursor-not-allowed'
+                    ]">
+                        {{ loading ? 'Guardando...' : 'Cerrar Lectura' }}
+                    </button>
+                </template>
             </div>
         </template>
     </div>
@@ -118,12 +129,16 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { readingService } from '../services/readingService';
 import { db } from '../firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
 
 const router = useRouter();
+const route = useRoute();
+const readingId = route.params.id;
+
+const isFirstReading = ref(false);
 
 // Estados
 const condos = ref([]);
@@ -133,7 +148,7 @@ const previousReadings = ref({});
 const success = ref('');
 
 const mainReading = ref({
-    date: new Date().toISOString().split('T')[0],
+    date: '', // Iniciar con fecha vacía
     reading: null,
     cost: null,
     status: 'open',
@@ -145,9 +160,23 @@ const unitReadings = ref({});
 const error = ref('');
 const loading = ref(false);
 
+const showMainReadingInputs = computed(() => !isFirstReading.value);
+
+
 // Nueva computed property para validar si se puede guardar la lectura principal
 const canSaveMainReading = computed(() => {
-    return selectedCondoId.value && mainReading.value.date;
+    if (!selectedCondoId.value || !mainReading.value.date) return false;
+
+    if (isFirstReading.value) {
+        // Para primera lectura, verificar que todas las unidades tengan lectura inicial
+        return units.value.length > 0 && units.value.every(unit =>
+            unitReadings.value[unit.id] &&
+            Number(unitReadings.value[unit.id]) > 0
+        );
+    }
+
+    // Para lecturas posteriores
+    return true;
 });
 
 // Computed properties
@@ -155,22 +184,52 @@ const canClose = computed(() => {
     if (!mainReadingId.value || !mainReading.value.reading || !mainReading.value.cost) return false;
 
     // Verificar que todas las unidades tengan lectura y sean mayores que sus lecturas anteriores
-    return units.value.every(unit => {
+    const allReadingsValid = units.value.every(unit => {
         const currentReading = Number(unitReadings.value[unit.id]);
         const previousReading = previousReadings.value[unit.id] || 0;
         return currentReading && currentReading > previousReading;
     });
+
+    return allReadingsValid;
 });
 
 // Métodos nuevos y actualizados
 const saveMainReading = async () => {
-    if (!canSaveMainReading.value || loading.value) return;
+    if (!canSaveMainReading.value) {
+        error.value = isFirstReading.value
+            ? 'Todas las unidades deben tener una lectura inicial'
+            : 'Faltan datos requeridos';
+        return;
+    }
 
     try {
         loading.value = true;
         error.value = '';
         success.value = '';
 
+        // Validar que todas las unidades tengan lectura para primera lectura
+        if (isFirstReading.value) {
+            const missingUnits = units.value.filter(unit =>
+                !unitReadings.value[unit.id] || Number(unitReadings.value[unit.id]) <= 0
+            );
+
+            if (missingUnits.length > 0) {
+                error.value = `Faltan lecturas para las unidades: ${missingUnits.map(u => u.name).join(', ')}`;
+                return;
+            }
+
+            await readingService.createFirstReading(
+                selectedCondoId.value,
+                mainReading.value.date,
+                unitReadings.value
+            );
+
+            success.value = 'Lectura base creada correctamente';
+            router.push('/meter-readings');
+            return;
+        }
+
+        // Flujo para lecturas normales
         const readingData = {
             date: mainReading.value.date,
             condoId: selectedCondoId.value,
@@ -179,20 +238,38 @@ const saveMainReading = async () => {
             cost: mainReading.value.cost || null
         };
 
-        if (mainReadingId.value) {
-            await readingService.updateMainReading(mainReadingId.value, readingData);
-        } else {
-            mainReadingId.value = await readingService.createMainReading(readingData);
+        try {
             if (mainReadingId.value) {
-                await loadPreviousReadings();
-            }
-        }
+                await readingService.updateMainReading(mainReadingId.value, readingData);
+                success.value = 'Lectura actualizada correctamente';
+            } else {
+                // Crear la lectura principal
+                mainReadingId.value = await readingService.createMainReading(readingData);
 
-        success.value = mainReadingId.value ? 'Lectura actualizada' : 'Lectura creada';
+                // Guardar las lecturas individuales existentes
+                if (Object.keys(unitReadings.value).length > 0) {
+                    const savePromises = Object.entries(unitReadings.value)
+                        .filter(([_, reading]) => reading && Number(reading) > 0)
+                        .map(([unitId, reading]) =>
+                            readingService.saveUnitReading(mainReadingId.value, {
+                                unitId,
+                                reading: Number(reading)
+                            })
+                        );
+
+                    await Promise.all(savePromises);
+                }
+                success.value = 'Lectura creada correctamente';
+            }
+        } catch (err) {
+            error.value = err.message;
+            if (!mainReadingId.value) {
+                mainReadingId.value = null;
+            }
+            throw err; // Re-lanzar para que el catch exterior lo maneje
+        }
     } catch (err) {
-        console.error('Error en saveMainReading:', err);
-        error.value = 'Error guardando lectura principal: ' + err.message;
-        mainReadingId.value = null;
+        error.value = err.message;
     } finally {
         loading.value = false;
     }
@@ -238,20 +315,30 @@ const loadPreviousReadings = async () => {
 
 // Actualizar handleCondoChange
 const handleCondoChange = async () => {
-    mainReadingId.value = null;
-    previousReadings.value = {};
-    units.value = [];
-    unitReadings.value = {};
-    error.value = '';
-    success.value = '';
+    mainReadingId.value = null; // Reset mainReadingId
+    unitReadings.value = {}; // Reset unitReadings
 
-    if (!selectedCondoId.value) {
-        mainReading.value.condoId = '';
-        return;
+    if (!selectedCondoId.value) return;
+
+    try {
+        loading.value = true;
+        error.value = '';
+
+        // Cargar en paralelo
+        const [isFirst, units] = await Promise.all([
+            readingService.isFirstReading(selectedCondoId.value),
+            loadUnits(),
+            loadPreviousReadings()
+        ]);
+
+        isFirstReading.value = isFirst;
+        mainReading.value.condoId = selectedCondoId.value;
+
+    } catch (err) {
+        error.value = err.message;
+    } finally {
+        loading.value = false;
     }
-
-    mainReading.value.condoId = selectedCondoId.value;
-    await loadUnits();
 };
 
 // Computed property para ordenar unidades
@@ -317,26 +404,15 @@ const closeReading = async () => {
 
     try {
         loading.value = true;
-        const calculations = calculateTotals();
 
-        // Crear lectura principal
-        const mainReadingId = await readingService.createMainReading(mainReading.value);
-
-        // Crear lecturas individuales
-        const unitReadingPromises = Object.entries(unitReadings.value).map(([unitId, reading]) =>
-            readingService.createUnitReading(mainReadingId, {
-                unitId,
-                reading: Number(reading)
-            })
-        );
-        await Promise.all(unitReadingPromises);
-
-        // Cerrar lectura y calcular costos
-        await readingService.closeMainReading(mainReadingId, calculations);
+        await readingService.closeReading(mainReadingId.value, {
+            reading: mainReading.value.reading,
+            cost: mainReading.value.cost
+        });
 
         router.push('/meter-readings');
     } catch (err) {
-        error.value = 'Error al cerrar la lectura: ' + err.message;
+        error.value = err.message;
     } finally {
         loading.value = false;
     }
@@ -346,8 +422,80 @@ const cancel = () => {
     router.back();
 };
 
-// Lifecycle hooks
+const loadExistingReading = async () => {
+    try {
+        loading.value = true;
+        error.value = '';
+
+        const docRef = doc(db, 'meter-readings', readingId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            const readingData = docSnap.data();
+            mainReading.value = {
+                date: readingData.date,
+                reading: readingData.reading,
+                cost: readingData.cost,
+                status: readingData.status,
+                condoId: readingData.condoId
+            };
+
+            selectedCondoId.value = readingData.condoId;
+            mainReadingId.value = readingId;
+
+            // Cargar los datos relacionados
+            await loadUnits();
+
+            try {
+                await loadPreviousReadings();
+            } catch (err) {
+                console.warn('Error loading previous readings, continuing without them:', err);
+                // No interrumpimos la carga si falla la obtención de lecturas anteriores
+            }
+
+            // Cargar lecturas individuales existentes
+            try {
+                const unitReadingsSnapshot = await getDocs(
+                    query(
+                        collection(db, 'unit-readings'),
+                        where('mainReadingId', '==', readingId)
+                    )
+                );
+
+                const readings = {};
+                unitReadingsSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    readings[data.unitId] = data.reading;
+                });
+                unitReadings.value = readings;
+            } catch (err) {
+                console.error('Error loading unit readings:', err);
+                error.value = 'Error cargando lecturas de unidades';
+            }
+        } else {
+            error.value = 'Lectura no encontrada';
+            router.push('/meter-readings');
+        }
+    } catch (err) {
+        console.error('Error loading reading:', err);
+        error.value = 'Error cargando la lectura: ' + err.message;
+    } finally {
+        loading.value = false;
+    }
+};
+
+// Modificar el lifecycle hook
 onMounted(async () => {
-    await loadCondos();
+    if (readingId) {
+        // Cargar lectura existente
+        await loadExistingReading();
+    } else {
+        // Cargar condominios para nueva lectura
+        await loadCondos();
+    }
 });
+
+const pageTitle = computed(() =>
+    mainReadingId.value ? 'Editar Lectura' : 'Nueva Lectura'
+);
 </script>

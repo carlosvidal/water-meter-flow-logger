@@ -26,19 +26,19 @@ const phone = ref('');
 
 const register = async () => {
     try {
-        // Crear el usuario con email y password en Firebase Authentication
         const userCredential = await createUserWithEmailAndPassword(auth, email.value, password.value);
         const user = userCredential.user;
 
-        // Guardar datos adicionales en Firestore
         await setDoc(doc(db, "users", user.uid), {
             name: name.value,
             email: email.value,
             phone: phone.value,
-            userType: "editor" // Por defecto todos los nuevos usuarios son de tipo editor
+            baseRole: "editor", // Cambiado de userType a baseRole
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date()
         });
 
-        // Redirigir al usuario a la página de inicio
         router.push('/');
     } catch (error) {
         console.error("Error en el registro:", error);

@@ -14,6 +14,7 @@ import CreateMeterReading from "../views/CreateMeterReading.vue";
 import CreateUser from "../views/CreateUser.vue";
 import CreateCondo from "@/views/CreateCondo.vue";
 import RegisterInvitation from "../views/RegisterInvitation.vue";
+import Unauthorized from "../views/Unauthorized.vue";
 
 import { auth, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -85,6 +86,23 @@ const routes = [
     },
   },
   {
+    path: "/reading/:id",
+    component: () => import("../views/Reading.vue"),
+    meta: {
+      requiresAuth: true,
+      allowedRoles: ["superadmin", "admin", "editor", "analyst"],
+    },
+  },
+  {
+    path: "/reading/:id/edit",
+    component: CreateMeterReading,
+    props: true,
+    meta: {
+      requiresAuth: true,
+      allowedRoles: ["superadmin", "admin", "editor"],
+    },
+  },
+  {
     path: "/reports",
     component: Reports,
     meta: {
@@ -145,6 +163,10 @@ const routes = [
       allowedUserTypes: ["superadmin", "admin"],
     },
   },
+  {
+    path: "/unauthorized",
+    component: Unauthorized,
+  },
 ];
 
 const router = createRouter({
@@ -152,32 +174,54 @@ const router = createRouter({
   routes,
 });
 
+const hasRequiredRole = (allowedRoles, userRole) => {
+  return allowedRoles.includes(userRole);
+};
+
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
-  if (requiresAuth) {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      next("/login");
-    } else {
-      const userType = await getUserType(currentUser.uid);
-      const allowedUserTypes = to.meta.allowedUserTypes || [];
-      if (allowedUserTypes.length && !allowedUserTypes.includes(userType)) {
-        alert("No tienes permiso para acceder a esta página.");
-        next("/");
-      } else {
-        next();
-      }
-    }
-  } else {
-    next();
+  const currentUser = auth.currentUser;
+
+  if (requiresAuth && !currentUser) {
+    next("/login");
+    return;
   }
+
+  if (currentUser) {
+    try {
+      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+      const userData = userDoc.data();
+      const userRole = userData?.baseRole;
+
+      // Verificar permisos específicos de la ruta
+      if (
+        to.meta.allowedRoles &&
+        !hasRequiredRole(to.meta.allowedRoles, userRole)
+      ) {
+        console.log(
+          "Access denied. User role:",
+          userRole,
+          "Required roles:",
+          to.meta.allowedRoles
+        );
+        next("/unauthorized");
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking user role:", error);
+      next("/error");
+      return;
+    }
+  }
+
+  next();
 });
 
-async function getUserType(uid) {
+async function getUserRole(uid) {
   const docRef = doc(db, "users", uid);
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
-    return docSnap.data().userType;
+    return docSnap.data().baseRole;
   } else {
     return null;
   }
