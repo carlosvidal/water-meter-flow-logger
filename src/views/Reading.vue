@@ -324,60 +324,39 @@ const loadReading = async () => {
         loading.value = true;
         error.value = null;
 
-        // Cargar lectura principal
+        // Una sola consulta para obtener toda la información de la lectura
         const readingDoc = await getDoc(doc(db, 'meter-readings', readingId));
         if (!readingDoc.exists()) {
             throw new Error('Lectura no encontrada');
         }
-        mainReading.value = { id: readingDoc.id, ...readingDoc.data() };
 
-        // Cargar nombre del condominio
-        const condoDoc = await getDoc(doc(db, 'condos', mainReading.value.condoId));
+        const readingData = readingDoc.data();
+        mainReading.value = { id: readingDoc.id, ...readingData };
+
+        // Convertir el mapa de lecturas a un array
+        unitReadings.value = Object.entries(readingData.unitReadings || {}).map(
+            ([unitId, reading]) => ({
+                unitId,
+                ...reading
+            })
+        );
+
+        // Cargar nombre del condominio (única consulta adicional necesaria)
+        const condoDoc = await getDoc(doc(db, 'condos', readingData.condoId));
         if (condoDoc.exists()) {
             condoName.value = condoDoc.data().name;
         }
 
-        // Cargar lecturas individuales
-        const unitReadingsQuery = query(
-            collection(db, 'unit-readings'),
-            where('mainReadingId', '==', readingId)
+        // Cargar información de unidades en una sola consulta
+        const unitsSnapshot = await getDocs(
+            query(collection(db, 'units'),
+                where('condoId', '==', readingData.condoId))
         );
-        const unitReadingsSnapshot = await getDocs(unitReadingsQuery);
-        unitReadings.value = unitReadingsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
 
-        // Cargar información de unidades
-        const unitIds = unitReadings.value.map(r => r.unitId);
-        for (const unitId of unitIds) {
-            const unitDoc = await getDoc(doc(db, 'units', unitId));
-            if (unitDoc.exists()) {
-                units.value[unitId] = unitDoc.data();
-            }
-
-            // Cargar lectura anterior para cada unidad
-            const previousReadingQuery = query(
-                collection(db, 'unit-readings'),
-                where('unitId', '==', unitId),
-                where('createdAt', '<', mainReading.value.createdAt),
-                orderBy('createdAt', 'desc'),
-                limit(1)
-            );
-
-            const previousReadingSnapshot = await getDocs(previousReadingQuery);
-            if (!previousReadingSnapshot.empty) {
-                previousReadings.value[unitId] = previousReadingSnapshot.docs[0].data().reading;
-            }
-        }
-
-        // Calcular y actualizar los costos para cada lectura
-        unitReadings.value = unitReadings.value.map(reading => ({
-            ...reading,
-            individualCost: calculateIndividualCost(reading),
-            commonAreaCost: calculateTotalCommonAreaCost(),
-            totalCost: calculateIndividualCost(reading) + calculateTotalCommonAreaCost()
-        }));
+        units.value = {};
+        unitsSnapshot.docs.forEach(doc => {
+            units.value[doc.id] = doc.data();
+        });
 
     } catch (err) {
         console.error('Error loading reading:', err);
