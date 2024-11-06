@@ -9,62 +9,75 @@
         </div>
 
         <div v-else class="space-y-6">
-            <!-- Header -->
-            <div class="flex justify-between items-center">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900">
-                        Detalles de Lectura
-                        <span class="text-sm font-normal text-gray-500">
-                            ({{ condoName }})
-                        </span>
-                    </h1>
-                    <p class="mt-1 text-sm text-gray-600">
-                        Fecha: {{ formatDate(mainReading?.date) }}
-                    </p>
-                </div>
+            <!-- Header principal -->
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-900">
+                    Detalles de Lectura
+                </h1>
                 <div class="flex items-center space-x-3">
+                    <button @click="exportReadingDetails" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 
+                       focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                        Exportar a CSV
+                    </button>
                     <span
-                        :class="`px-2 py-1 text-sm font-semibold rounded-full ${mainReading?.status === 'open' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`">
+                        :class="`px-2 py-1 text-sm font-semibold rounded-full 
+                      ${mainReading?.status === 'open' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`">
                         {{ mainReading?.status === 'open' ? 'Abierta' : 'Cerrada' }}
                     </span>
                 </div>
             </div>
 
-            <!-- Lectura Principal -->
-            <div class="bg-white shadow rounded-lg p-6">
-                <h2 class="text-lg font-semibold mb-4">Lectura Principal</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-600">Lectura Total</label>
-                        <p class="mt-1 text-lg">{{ mainReading?.reading }} m³</p>
+            <!-- Contenedor principal para Lectura Principal y Distribución -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Lectura Principal - ocupa 2/3 del espacio -->
+                <div class="bg-white shadow rounded-lg p-6 lg:col-span-2">
+                    <div class="mb-6">
+                        <p class="text-sm text-gray-500">{{ condoName }}</p>
+                        <p class="text-sm text-gray-600">
+                            Fecha: {{ formatDate(mainReading?.date) }}
+                        </p>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-600">Costo Total</label>
-                        <p class="mt-1 text-lg">{{ formatCurrency(mainReading?.cost) }}</p>
+
+                    <h2 class="text-lg font-semibold mb-4">Lectura Principal</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600">Lectura Total</label>
+                            <p class="mt-1 text-lg">{{ mainReading?.reading }} m³</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600">Costo Total</label>
+                            <p class="mt-1 text-lg">{{ formatCurrency(mainReading?.cost) }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600">Costo por m³</label>
+                            <p class="mt-1 text-lg">{{ formatCurrency(calculateRate()) }} / m³</p>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-600">Costo por m³</label>
-                        <p class="mt-1 text-lg">{{ formatCurrency(calculateRate()) }} / m³</p>
+
+                    <!-- Detalle de Consumos -->
+                    <div class="mt-6 border-t pt-4">
+                        <h3 class="text-sm font-medium text-gray-600 mb-3">Detalle de Consumos</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-500">Consumo Individual Total</label>
+                                <p class="mt-1 text-lg">{{ formatReading(calculateTotalConsumption()) }} m³</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-500">Consumo Áreas Comunes</label>
+                                <p class="mt-1 text-lg">{{ formatReading(calculateCommonAreaConsumption()) }} m³</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-500">Porcentaje Áreas Comunes</label>
+                                <p class="mt-1 text-lg">{{ calculateCommonAreaPercentage() }}%</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Agregar sección de consumos -->
-                <div class="mt-6 border-t pt-4">
-                    <h3 class="text-sm font-medium text-gray-600 mb-3">Detalle de Consumos</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-500">Consumo Individual Total</label>
-                            <p class="mt-1 text-lg">{{ formatReading(calculateTotalConsumption()) }} m³</p>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-500">Consumo Áreas Comunes</label>
-                            <p class="mt-1 text-lg">{{ formatReading(calculateCommonAreaConsumption()) }} m³</p>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-500">Porcentaje Áreas Comunes</label>
-                            <p class="mt-1 text-lg">{{ calculateCommonAreaPercentage() }}%</p>
-                        </div>
-                    </div>
+                <!-- Gráfico de distribución de consumos -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h2 class="text-lg font-semibold mb-4 text-center">Distribución de Consumos</h2>
+                    <PieChart :data="chartData" class="w-full" />
                 </div>
             </div>
 
@@ -80,23 +93,23 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                                     Unidad
                                 </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                                     Lectura Anterior (m³)
                                 </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                                     Lectura Actual (m³)
                                 </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                                     Consumo (m³)
                                 </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Costo Individual
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                                    Costo Individual (S/)
                                 </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Áreas Comunes
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                                    Áreas Comunes (S/)
                                 </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Total
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                                    Total (S/)
                                 </th>
                             </tr>
                         </thead>
@@ -108,40 +121,43 @@
                                         {{ getUnitName(reading.unitId) }}
                                     </router-link>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
                                     {{ formatReading(getPreviousReading(reading.unitId)) }}
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
                                     {{ formatReading(reading.reading) }}
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
                                     {{ formatReading(calculateConsumption(reading)) }}
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    {{ formatCurrency(reading.individualCost) }}
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
+                                    {{ formatNumberOnly(reading.individualCost) }}
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    {{ formatCurrency(reading.commonAreaCost) }}
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
+                                    {{ formatNumberOnly(reading.commonAreaCost) }}
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap font-medium">
-                                    {{ formatCurrency(reading.totalCost) }}
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums font-medium">
+                                    {{ formatNumberOnly(reading.totalCost) }}
                                 </td>
                             </tr>
                         </tbody>
                         <tfoot class="bg-gray-50">
                             <tr>
                                 <td class="px-6 py-4 whitespace-nowrap font-medium">Totales</td>
-                                <td class="px-6 py-4 whitespace-nowrap">-</td>
-                                <td class="px-6 py-4 whitespace-nowrap">{{ formatReading(calculateTotalReading()) }}
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">-</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">-</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
+                                    {{ formatReading(calculateTotalConsumption()) }}
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">{{ formatReading(calculateTotalConsumption()) }}
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
+                                    {{ formatNumberOnly(calculateTotalIndividualCost()) }}
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    {{ formatCurrency(calculateTotalIndividualCost()) }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    {{ formatCurrency(calculateTotalCommonAreaCost()) }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap font-medium">
-                                    {{ formatCurrency(calculateTotalCost()) }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
+                                    {{ formatNumberOnly(calculateTotalCommonAreaAmount()) }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums font-medium">
+                                    {{ formatNumberOnly(calculateTotalCost()) }}
+                                </td>
                             </tr>
                         </tfoot>
                     </table>
@@ -156,6 +172,9 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { db } from '../firebase';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { exportToCSV } from '../utils/csvExport';
+import PieChart from '@/components/PieChart.vue';
+
 
 const route = useRoute();
 const readingId = route.params.id;
@@ -257,7 +276,12 @@ const calculateTotalCommonAreaCost = () => {
     if (!mainReading.value?.cost || unitReadings.value.length === 0) return 0;
     const totalIndividualCost = calculateTotalIndividualCost();
     const remainingCost = mainReading.value.cost - totalIndividualCost;
-    return remainingCost / unitReadings.value.length; // Dividir el costo restante entre todas las unidades
+    return remainingCost / unitReadings.value.length; // Costo por unidad
+};
+
+const calculateTotalCommonAreaAmount = () => {
+    // Multiplicamos el costo de áreas comunes por unidad por el número de unidades
+    return calculateTotalCommonAreaCost() * unitReadings.value.length;
 };
 
 const calculateTotalCost = () => {
@@ -362,6 +386,126 @@ const loadReading = async () => {
         loading.value = false;
     }
 };
+
+// Función para preparar y exportar los datos
+const exportReadingDetails = () => {
+    // Definir los encabezados y getters para el CSV
+    const headers = [
+        { label: 'Unidad', getter: item => item.isTotal ? 'Totales' : getUnitName(item.unitId) },
+        { label: 'Lectura Anterior (m³)', getter: item => item.isTotal ? '-' : formatReading(getPreviousReading(item.unitId)) },
+        { label: 'Lectura Actual (m³)', getter: item => item.isTotal ? '-' : formatReading(item.reading) },
+        {
+            label: 'Consumo (m³)', getter: item => {
+                if (item.isTotal) {
+                    return formatReading(calculateTotalConsumption());
+                }
+                return formatReading(calculateConsumption(item));
+            }
+        },
+        {
+            label: 'Costo Individual', getter: item => {
+                if (item.isTotal) {
+                    return formatCurrencyRaw(calculateTotalIndividualCost());
+                }
+                return formatCurrencyRaw(item.individualCost);
+            }
+        },
+        {
+            label: 'Costo Áreas Comunes', getter: item => {
+                if (item.isTotal) {
+                    return formatCurrencyRaw(calculateTotalCommonAreaAmount());
+                }
+                return formatCurrencyRaw(item.commonAreaCost);
+            }
+        },
+        {
+            label: 'Costo Total', getter: item => {
+                if (item.isTotal) {
+                    return formatCurrencyRaw(calculateTotalCost());
+                }
+                return formatCurrencyRaw(item.totalCost);
+            }
+        }
+    ];
+
+    // Preparar datos adicionales del resumen
+    const summaryData = [{
+        isTotal: true,
+        unitId: 'TOTAL',
+        reading: calculateTotalReading(),
+        consumption: calculateTotalConsumption(),
+        individualCost: calculateTotalIndividualCost(),
+        commonAreaCost: calculateTotalCommonAreaCost(),
+        totalCost: calculateTotalCost()
+    }];
+
+    // Combinar las lecturas individuales con el resumen
+    const exportData = [...unitReadings.value, ...summaryData];
+
+    // Generar nombre del archivo
+    const filename = `lectura_${condoName.value}_${formatDate(mainReading.value?.date)}.csv`;
+
+    // Exportar a CSV
+    exportToCSV(exportData, headers, filename);
+};
+
+// Agregar función auxiliar para formatear moneda sin el símbolo
+const formatCurrencyRaw = (amount) => {
+    if (!amount) return '0.00';
+    return amount.toFixed(2);
+};
+
+const formatNumberOnly = (amount) => {
+    if (!amount) return '0.00';
+    return amount.toFixed(2);
+};
+
+const chartData = computed(() => {
+    if (!mainReading.value || unitReadings.value.length === 0) return [];
+
+    // Consumo total (ya está en litros)
+    const totalConsumption = mainReading.value.reading * 1000;
+
+    // Preparar datos de unidades
+    const unitData = sortedUnitReadings.value.map(reading => ({
+        name: getUnitName(reading.unitId),
+        value: calculateConsumption(reading) / 1000 // Convertir a m³
+    }));
+
+    // Calcular áreas comunes como la diferencia entre el total y la suma de unidades
+    const individualTotal = sortedUnitReadings.value.reduce(
+        (sum, reading) => sum + calculateConsumption(reading),
+        0
+    );
+
+    const commonArea = {
+        name: 'Áreas Comunes',
+        value: (totalConsumption - individualTotal) / 1000 // Convertir a m³
+    };
+
+    return [...unitData, commonArea];
+});
+
+const consumptionChartData = computed(() => {
+    if (!mainReading.value || unitReadings.value.length === 0) return [];
+
+    // Datos de consumos individuales
+    const individualData = sortedUnitReadings.value.map(reading => ({
+        name: getUnitName(reading.unitId),
+        value: calculateConsumption(reading) / 1000 // Convertir a m³
+    }));
+
+    // Agregar consumo de áreas comunes
+    const commonAreaConsumption = calculateCommonAreaConsumption() / 1000; // Convertir a m³
+    if (commonAreaConsumption > 0) {
+        individualData.push({
+            name: 'Áreas Comunes',
+            value: commonAreaConsumption
+        });
+    }
+
+    return individualData;
+});
 
 onMounted(() => {
     loadReading();

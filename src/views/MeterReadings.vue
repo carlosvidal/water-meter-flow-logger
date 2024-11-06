@@ -20,6 +20,18 @@
             </button>
         </div>
 
+        <!-- Filtro por condominio -->
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Filtrar por condominio</label>
+            <select v-model="selectedCondoId"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <option value="">Todos los condominios</option>
+                <option v-for="condo in condos" :key="condo.id" :value="condo.id">
+                    {{ condo.name }}
+                </option>
+            </select>
+        </div>
+
         <!-- Loading State -->
         <div v-if="loading" class="text-center py-8">
             <p class="text-gray-600">Cargando lecturas...</p>
@@ -31,7 +43,7 @@
         </div>
 
         <!-- Empty State -->
-        <div v-else-if="readings.length === 0" class="text-center py-8">
+        <div v-else-if="filteredReadings.length === 0" class="text-center py-8">
             <p class="text-gray-600">No hay lecturas registradas</p>
         </div>
 
@@ -67,12 +79,12 @@
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                    <tr v-for="reading in sortedReadings" :key="reading.id" class="hover:bg-gray-50">
+                    <tr v-for="reading in filteredReadings" :key="reading.id" class="hover:bg-gray-50">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {{ formatDate(reading.date) }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {{ condos[reading.condoId]?.name || 'Cargando...' }}
+                            {{ condos.find(c => c.id === reading.condoId)?.name || 'Cargando...' }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {{ reading.reading ? `${reading.reading} m³` : '-' }}
@@ -112,10 +124,11 @@ import AuthDebug from '../components/AuthDebug.vue';
 import { db } from '../firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
-const readings = ref([]); // Añadir esta línea
-const condos = ref({}); // Añadir esta línea
-const loading = ref(false); // Añadir esta línea
-const error = ref(null); // Añadir esta línea
+const readings = ref([]);
+const condos = ref([]);
+const selectedCondoId = ref('');
+const loading = ref(false);
+const error = ref(null);
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -126,11 +139,10 @@ const canManageReadings = computed(() => {
     return role === 'superadmin' || role === 'admin' || role === 'editor';
 });
 
-// Ordenar lecturas por fecha, más recientes primero
-const sortedReadings = computed(() => {
-    return [...readings.value].sort((a, b) =>
-        new Date(b.date) - new Date(a.date)
-    );
+// Computed property para filtrar lecturas por condominio
+const filteredReadings = computed(() => {
+    if (!selectedCondoId.value) return readings.value;
+    return readings.value.filter(reading => reading.condoId === selectedCondoId.value);
 });
 
 // Formatear fecha
@@ -145,6 +157,20 @@ const formatCurrency = (amount) => {
         style: 'currency',
         currency: 'PEN'
     }).format(amount);
+};
+
+// Cargar condominios
+const fetchCondos = async () => {
+    try {
+        const querySnapshot = await getDocs(collection(db, 'condos'));
+        condos.value = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+    } catch (err) {
+        console.error('Error loading condos:', err);
+        error.value = 'Error al cargar los condominios';
+    }
 };
 
 // Cargar lecturas
@@ -164,34 +190,12 @@ const fetchReadings = async () => {
         }));
 
         // Cargar información de condominios
-        await loadCondos();
+        await fetchCondos();
     } catch (err) {
         console.error('Error fetching readings:', err);
         error.value = 'Error al cargar las lecturas';
     } finally {
         loading.value = false;
-    }
-};
-
-// Cargar condominios
-const loadCondos = async () => {
-    try {
-        const condoIds = new Set(readings.value.map(r => r.condoId));
-        const condosSnapshot = await getDocs(collection(db, 'condos'));
-        const condosData = {};
-
-        condosSnapshot.forEach(doc => {
-            if (condoIds.has(doc.id)) {
-                condosData[doc.id] = {
-                    id: doc.id,
-                    ...doc.data()
-                };
-            }
-        });
-
-        condos.value = condosData;
-    } catch (err) {
-        console.error('Error loading condos:', err);
     }
 };
 
