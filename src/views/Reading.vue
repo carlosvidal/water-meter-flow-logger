@@ -156,7 +156,7 @@
                                     {{ formatNumberOnly(calculateTotalCommonAreaAmount()) }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums font-medium">
-                                    {{ formatNumberOnly(calculateTotalCost()) }}
+                                    {{ formatNumberOnly(mainReading?.cost) }}
                                 </td>
                             </tr>
                         </tfoot>
@@ -168,7 +168,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { db } from '../firebase';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -202,7 +202,9 @@ const sortedUnitReadings = computed(() => {
 
 const formatReading = (value) => {
     if (value === null || value === undefined) return '-';
-    return (value / 1000).toFixed(3);
+    // Asegurarse de que estamos trabajando con números
+    const numValue = Number(value);
+    return isNaN(numValue) ? '-' : numValue.toFixed(3);
 };
 
 const getAdjustedReading = (value) => {
@@ -211,8 +213,19 @@ const getAdjustedReading = (value) => {
 };
 
 const getPreviousReading = (unitId) => {
-    return previousReadings.value[unitId] || null;
+    // Buscar la lectura unitaria correspondiente
+    const unitReading = unitReadings.value.find(reading => reading.unitId === unitId);
+    // Obtener el valor de previousReading de la lectura unitaria
+    return unitReading?.previousReading || null;
 };
+
+watch(units, (newUnits) => {
+    console.log('Unidades actualizadas:', newUnits);
+}, { deep: true });
+
+watch(unitReadings, (newReadings) => {
+    console.log('Lecturas actualizadas:', newReadings);
+}, { deep: true });
 
 
 const formatDate = (dateString) => {
@@ -236,17 +249,18 @@ const calculateRate = () => {
 };
 
 const getUnitName = (unitId) => {
-    return units.value[unitId]?.name || 'Unidad no encontrada';
+    const unit = units.value[unitId];
+    if (!unit) {
+        console.warn(`Unidad no encontrada para el ID: ${unitId}`); // Para debug
+        return 'Unidad no encontrada';
+    }
+    return unit.name;
 };
 
 const calculateConsumption = (reading) => {
-    const previousReading = getPreviousReading(reading.unitId);
-    if (previousReading === null) {
-        // Si no hay lectura anterior, usar la lectura actual sin ajustes
-        return reading.reading;
-    }
-    // Calcular la diferencia con valores originales
-    return reading.reading - previousReading;
+    if (!reading.previousReading) return 0;
+    // La diferencia entre la lectura actual y la anterior
+    return reading.reading - reading.previousReading;
 };
 const calculateIndividualCost = (reading) => {
     const consumption = calculateConsumption(reading);
@@ -261,15 +275,18 @@ const calculateTotalReading = () => {
 };
 
 const calculateTotalConsumption = () => {
-    return unitReadings.value.reduce((sum, reading) =>
-        sum + calculateConsumption(reading),
-        0
-    );
+    return unitReadings.value.reduce((sum, reading) => {
+        const consumption = reading.reading - (reading.previousReading || 0);
+        return sum + consumption;
+    }, 0);
 };
 
+
 const calculateTotalIndividualCost = () => {
-    return unitReadings.value.reduce((sum, reading) =>
-        sum + calculateIndividualCost(reading), 0);
+    return unitReadings.value.reduce((sum, reading) => {
+        const individualCost = Number(reading.individualCost);
+        return isNaN(individualCost) ? sum : sum + individualCost;
+    }, 0);
 };
 
 const calculateTotalCommonAreaCost = () => {
@@ -279,9 +296,11 @@ const calculateTotalCommonAreaCost = () => {
     return remainingCost / unitReadings.value.length; // Costo por unidad
 };
 
+
 const calculateTotalCommonAreaAmount = () => {
-    // Multiplicamos el costo de áreas comunes por unidad por el número de unidades
-    return calculateTotalCommonAreaCost() * unitReadings.value.length;
+    return unitReadings.value.reduce((sum, reading) => {
+        return sum + (reading.commonAreaCost || 0);
+    }, 0);
 };
 
 const calculateTotalCost = () => {
@@ -324,7 +343,7 @@ const loadReading = async () => {
         loading.value = true;
         error.value = null;
 
-        // Una sola consulta para obtener toda la información de la lectura
+        // Obtener la lectura actual
         const readingDoc = await getDoc(doc(db, 'meter-readings', readingId));
         if (!readingDoc.exists()) {
             throw new Error('Lectura no encontrada');
@@ -333,7 +352,26 @@ const loadReading = async () => {
         const readingData = readingDoc.data();
         mainReading.value = { id: readingDoc.id, ...readingData };
 
-        // Convertir el mapa de lecturas a un array
+        // Cargar información de unidades primero
+        const unitsSnapshot = await getDocs(
+            query(
+                collection(db, 'units'),
+                where('condoId', '==', readingData.condoId)
+            )
+        );
+
+        // Crear un mapa de unidades para acceso rápido
+        units.value = {};
+        unitsSnapshot.docs.forEach(doc => {
+            units.value[doc.id] = {
+                id: doc.id,
+                ...doc.data()
+            };
+        });
+
+        console.log('Unidades cargadas:', units.value); // Para debug
+
+        // Convertir el mapa de lecturas a un array después de cargar las unidades
         unitReadings.value = Object.entries(readingData.unitReadings || {}).map(
             ([unitId, reading]) => ({
                 unitId,
@@ -341,22 +379,13 @@ const loadReading = async () => {
             })
         );
 
-        // Cargar nombre del condominio (única consulta adicional necesaria)
+        console.log('Lecturas unitarias:', unitReadings.value); // Para debug
+
+        // Cargar nombre del condominio
         const condoDoc = await getDoc(doc(db, 'condos', readingData.condoId));
         if (condoDoc.exists()) {
             condoName.value = condoDoc.data().name;
         }
-
-        // Cargar información de unidades en una sola consulta
-        const unitsSnapshot = await getDocs(
-            query(collection(db, 'units'),
-                where('condoId', '==', readingData.condoId))
-        );
-
-        units.value = {};
-        unitsSnapshot.docs.forEach(doc => {
-            units.value[doc.id] = doc.data();
-        });
 
     } catch (err) {
         console.error('Error loading reading:', err);
@@ -365,7 +394,6 @@ const loadReading = async () => {
         loading.value = false;
     }
 };
-
 // Función para preparar y exportar los datos
 const exportReadingDetails = () => {
     // Definir los encabezados y getters para el CSV
@@ -435,8 +463,9 @@ const formatCurrencyRaw = (amount) => {
 };
 
 const formatNumberOnly = (amount) => {
-    if (!amount) return '0.00';
-    return amount.toFixed(2);
+    if (amount === null || amount === undefined) return '0.00';
+    const numValue = Number(amount);
+    return isNaN(numValue) ? '0.00' : numValue.toFixed(2);
 };
 
 const chartData = computed(() => {

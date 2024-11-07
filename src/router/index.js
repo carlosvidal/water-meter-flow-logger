@@ -95,7 +95,7 @@ const routes = [
   },
   {
     path: "/reading/:id/edit",
-    component: CreateMeterReading,
+    component: () => import("@/views/ReadingManager.vue"),
     props: true,
     meta: {
       requiresAuth: true,
@@ -128,7 +128,7 @@ const routes = [
   },
   {
     path: "/create-reading",
-    component: CreateMeterReading,
+    component: () => import("@/views/ReadingManager.vue"),
     meta: {
       requiresAuth: true,
       allowedUserTypes: ["owner", "admin", "superadmin", "editor"],

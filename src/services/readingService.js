@@ -153,133 +153,63 @@ export const readingService = {
     }
   },
 
+  // readingService.js
   async createMainReading(readingData) {
     try {
-      console.log("=== Iniciando creación de lectura ===");
-      console.log(
-        "Datos recibidos completos:",
-        JSON.stringify(readingData, null, 2)
-      );
+      console.log("=== INICIO DE CREACIÓN DE LECTURA ===");
+      console.log("Datos recibidos:", JSON.stringify(readingData, null, 2));
 
-      // Validación más estricta
+      // Validaciones
+      if (!readingData) {
+        throw new Error("No se recibieron datos de lectura");
+      }
+
+      // Validar estructura básica
       const requiredFields = [
         "condoId",
         "date",
         "reading",
         "cost",
         "unitReadings",
+        "status",
       ];
       const missingFields = requiredFields.filter(
         (field) => !readingData[field]
       );
 
       if (missingFields.length > 0) {
-        console.error("Campos faltantes:", missingFields);
+        console.error("Faltan campos:", missingFields);
+        console.error("Datos recibidos:", readingData);
         throw new Error(
           `Faltan campos requeridos: ${missingFields.join(", ")}`
         );
       }
 
+      // Validar lecturas individuales
       if (
         !readingData.unitReadings ||
-        typeof readingData.unitReadings !== "object"
+        Object.keys(readingData.unitReadings).length === 0
       ) {
-        console.error("unitReadings inválido:", readingData.unitReadings);
-        throw new Error(
-          "El objeto unitReadings es requerido y debe ser un objeto"
-        );
+        throw new Error("No hay lecturas individuales registradas");
       }
 
-      // Validar datos básicos
-      if (
-        !readingData.condoId ||
-        !readingData.date ||
-        !readingData.reading ||
-        !readingData.cost
-      ) {
-        const missing = ["condoId", "date", "reading", "cost"].filter(
-          (field) => !readingData[field]
-        );
-        throw new Error(`Faltan datos requeridos: ${missing.join(", ")}`);
-      }
-
-      // Validar lecturas individuales
-      if (!readingData.unitReadings) {
-        console.error("unitReadings es undefined o null:", readingData);
-        throw new Error("El objeto unitReadings es requerido");
-      }
-
-      const unitReadingsCount = Object.keys(readingData.unitReadings).length;
-      if (unitReadingsCount === 0) {
-        throw new Error("No hay lecturas individuales");
-      }
-
-      console.log(
-        `Encontradas ${unitReadingsCount} lecturas individuales:`,
-        readingData.unitReadings
-      );
-
-      console.log(`Encontradas ${unitReadingsCount} lecturas individuales`);
-
-      // Obtener y validar contra lectura anterior...
-      const previousReading = await this.getLastClosedReading(
-        readingData.condoId
-      );
-
-      // Formatear lecturas
-      const formattedReadings = {};
-      for (const [unitId, reading] of Object.entries(
-        readingData.unitReadings
-      )) {
-        const previousValue =
-          previousReading?.unitReadings?.[unitId]?.reading || 0;
-        const currentValue = Number(reading);
-
-        console.log(`Procesando unidad ${unitId}:`, {
-          currentValue,
-          previousValue,
-          rawReading: reading,
-        });
-
-        if (isNaN(currentValue) || currentValue <= 0) {
-          throw new Error(`Lectura inválida para unidad ${unitId}: ${reading}`);
-        }
-
-        formattedReadings[unitId] = {
-          reading: currentValue,
-          previousReading: previousValue,
-          consumption: currentValue - previousValue,
-        };
-      }
-
-      // Crear documento
-      const mainReadingDoc = {
+      // Crear el documento
+      const docRef = await addDoc(collection(db, "meter-readings"), {
         ...readingData,
-        unitReadings: formattedReadings,
-        status: "open",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      };
+      });
 
-      console.log("Documento final:", mainReadingDoc);
-
-      const docRef = await addDoc(
-        collection(db, "meter-readings"),
-        mainReadingDoc
-      );
+      console.log("Lectura creada exitosamente con ID:", docRef.id);
       return docRef.id;
     } catch (error) {
       console.error("Error en createMainReading:", error);
-      console.error("Stack trace:", error.stack);
-      console.error(
-        "Datos que causaron el error:",
-        JSON.stringify(readingData, null, 2)
-      );
       throw error;
     }
   },
-  // Cerrar lectura
-  async closeReading(readingId) {
+
+  // En readingService.js
+  async getReading(readingId) {
     try {
       const docRef = doc(db, "meter-readings", readingId);
       const docSnap = await getDoc(docRef);
@@ -288,22 +218,129 @@ export const readingService = {
         throw new Error("Lectura no encontrada");
       }
 
-      const readingData = docSnap.data();
+      return {
+        id: docSnap.id,
+        ...docSnap.data(),
+      };
+    } catch (error) {
+      console.error("Error getting reading:", error);
+      throw error;
+    }
+  },
 
-      if (
-        !readingData.unitReadings ||
-        Object.keys(readingData.unitReadings).length === 0
-      ) {
-        throw new Error("La lectura debe tener lecturas individuales");
+  // Cerrar lectura
+  // En readingService.js
+
+  async closeReading(readingId) {
+    try {
+      const docRef = doc(db, "meter-readings", readingId);
+      const readingSnap = await getDoc(docRef);
+
+      if (!readingSnap.exists()) {
+        throw new Error("Lectura no encontrada");
       }
 
+      const readingData = readingSnap.data();
+
+      // Validaciones
+      if (readingData.status === "closed") {
+        throw new Error("La lectura ya está cerrada");
+      }
+
+      if (
+        !readingData.reading ||
+        !readingData.cost ||
+        !readingData.unitReadings
+      ) {
+        throw new Error("Faltan datos requeridos para cerrar la lectura");
+      }
+
+      // Procesar lecturas individuales
+      const processedReadings = {};
+      let totalUnitConsumption = 0;
+
+      // Primero obtenemos las lecturas anteriores
+      const previousReadings = await this.getPreviousReadings(
+        readingData.condoId
+      );
+
+      // Procesamos cada lectura
+      for (const [unitId, unitData] of Object.entries(
+        readingData.unitReadings
+      )) {
+        const currentReading = Number(unitData.reading || unitData);
+        const previousReading = Number(previousReadings[unitId] || 0);
+        const consumption = currentReading - previousReading;
+
+        if (isNaN(currentReading) || isNaN(previousReading)) {
+          throw new Error(`Lecturas inválidas para la unidad ${unitId}`);
+        }
+
+        totalUnitConsumption += consumption;
+
+        processedReadings[unitId] = {
+          reading: currentReading,
+          previousReading: previousReading,
+          consumption: consumption,
+        };
+      }
+
+      const totalReading = Number(readingData.reading);
+      const totalCost = Number(readingData.cost);
+
+      if (isNaN(totalReading) || isNaN(totalCost)) {
+        throw new Error("Lectura total o costo total inválidos");
+      }
+
+      // Calcular áreas comunes
+      const commonAreaConsumption = Math.max(
+        0,
+        totalReading - totalUnitConsumption
+      );
+      const costPerUnit = totalCost / totalReading;
+      const commonAreaCostPerUnit =
+        (commonAreaConsumption * costPerUnit) /
+        Object.keys(processedReadings).length;
+
+      // Calcular costos individuales
+      for (const unitId in processedReadings) {
+        const unitData = processedReadings[unitId];
+        unitData.individualCost = Number(
+          (unitData.consumption * costPerUnit).toFixed(2)
+        );
+        unitData.commonAreaCost = Number(commonAreaCostPerUnit.toFixed(2));
+        unitData.totalCost = Number(
+          (unitData.individualCost + unitData.commonAreaCost).toFixed(2)
+        );
+      }
+
+      const summary = {
+        totalReading,
+        totalCost,
+        totalUnitConsumption,
+        commonAreaConsumption,
+        commonAreaCostPerUnit: Number(commonAreaCostPerUnit.toFixed(2)),
+        costPerUnit: Number(costPerUnit.toFixed(2)),
+      };
+
+      // Actualizar documento
       await updateDoc(docRef, {
         status: "closed",
+        unitReadings: processedReadings,
+        commonAreaConsumption,
+        commonAreaCostPerUnit,
+        costPerUnit,
+        totalUnitConsumption,
         closedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        summary,
       });
 
-      return true;
+      return {
+        id: readingId,
+        processedReadings,
+        summary,
+      };
     } catch (error) {
       console.error("Error closing reading:", error);
       throw error;
