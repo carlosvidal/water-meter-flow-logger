@@ -24,14 +24,14 @@
             <!-- Campos adicionales si no es primera lectura -->
             <template v-if="!isFirstReading">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Lectura Principal (m³) *</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Volumen Facturado (m³) *</label>
                     <input type="number" v-model="form.reading" required min="0" step="0.001"
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                         placeholder="0.000" />
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Costo Total *</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Monto Facturado *</label>
                     <input type="number" v-model="form.cost" required min="0" step="0.01"
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                         placeholder="0.00" />

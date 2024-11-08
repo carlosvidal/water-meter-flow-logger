@@ -41,11 +41,11 @@
                     <h2 class="text-lg font-semibold mb-4">Lectura Principal</h2>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
-                            <label class="block text-sm font-medium text-gray-600">Lectura Total</label>
+                            <label class="block text-sm font-medium text-gray-600">Volumen Facturado</label>
                             <p class="mt-1 text-lg">{{ mainReading?.reading }} m³</p>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-600">Costo Total</label>
+                            <label class="block text-sm font-medium text-gray-600">Monto Facturado</label>
                             <p class="mt-1 text-lg">{{ formatCurrency(mainReading?.cost) }}</p>
                         </div>
                         <div>
@@ -60,11 +60,12 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div>
                                 <label class="block text-sm font-medium text-gray-500">Consumo Individual Total</label>
-                                <p class="mt-1 text-lg">{{ formatReading(calculateTotalConsumption()) }} m³</p>
+                                <p class="mt-1 text-lg">{{ formatReadingMetros(calculateTotalConsumption()) }} m³</p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-500">Consumo Áreas Comunes</label>
-                                <p class="mt-1 text-lg">{{ formatReading(calculateCommonAreaConsumption()) }} m³</p>
+                                <p class="mt-1 text-lg">{{ formatReadingMetros(calculateCommonAreaConsumption()) }} m³
+                                </p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-500">Porcentaje Áreas Comunes</label>
@@ -122,19 +123,19 @@
                                     </router-link>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
-                                    {{ formatReading(getPreviousReading(reading.unitId)) }}
+                                    {{ formatReadingMetros(reading.previousReading) }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
-                                    {{ formatReading(reading.reading) }}
+                                    {{ formatReadingMetros(reading.reading) }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
-                                    {{ formatReading(calculateConsumption(reading)) }}
+                                    {{ formatReadingMetros(calculateConsumption(reading)) }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
                                     {{ formatNumberOnly(reading.individualCost) }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
-                                    {{ formatNumberOnly(reading.commonAreaCost) }}
+                                    {{ formatNumberOnly(reading.commonAreaCost || calculateTotalCommonAreaCost()) }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums font-medium">
                                     {{ formatNumberOnly(reading.totalCost) }}
@@ -147,7 +148,7 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">-</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">-</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
-                                    {{ formatReading(calculateTotalConsumption()) }}
+                                    {{ formatReadingMetros(calculateTotalConsumption()) }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-mono tabular-nums">
                                     {{ formatNumberOnly(calculateTotalIndividualCost()) }}
@@ -202,10 +203,19 @@ const sortedUnitReadings = computed(() => {
 
 const formatReading = (value) => {
     if (value === null || value === undefined) return '-';
-    // Asegurarse de que estamos trabajando con números
-    const numValue = Number(value);
+    // Convertir de litros a m³ para la visualización
+    const numValue = Number(value) / 1000;
     return isNaN(numValue) ? '-' : numValue.toFixed(3);
 };
+
+// Funciones de formateo
+const formatReadingLitros = (value) => {
+    if (value === null || value === undefined) return '-';
+    // Los valores ya están en litros, solo convertir a m³
+    const numValue = Number(value) / 1000;
+    return isNaN(numValue) ? '-' : numValue.toFixed(3);
+};
+
 
 const getAdjustedReading = (value) => {
     if (value === null || value === undefined) return 0;
@@ -244,8 +254,8 @@ const formatCurrency = (amount) => {
 
 const calculateRate = () => {
     if (!mainReading.value?.reading || !mainReading.value?.cost) return 0;
-    // Ajustamos tanto la lectura como el costo
-    return (mainReading.value.cost / 1000) / getAdjustedReading(mainReading.value.reading);
+    // Costo por m³
+    return mainReading.value.cost / mainReading.value.reading;
 };
 
 const getUnitName = (unitId) => {
@@ -257,11 +267,7 @@ const getUnitName = (unitId) => {
     return unit.name;
 };
 
-const calculateConsumption = (reading) => {
-    if (!reading.previousReading) return 0;
-    // La diferencia entre la lectura actual y la anterior
-    return reading.reading - reading.previousReading;
-};
+
 const calculateIndividualCost = (reading) => {
     const consumption = calculateConsumption(reading);
     const rate = calculateRate();
@@ -274,12 +280,7 @@ const calculateTotalReading = () => {
         sum + getAdjustedReading(reading.reading), 0);
 };
 
-const calculateTotalConsumption = () => {
-    return unitReadings.value.reduce((sum, reading) => {
-        const consumption = reading.reading - (reading.previousReading || 0);
-        return sum + consumption;
-    }, 0);
-};
+
 
 
 const calculateTotalIndividualCost = () => {
@@ -291,16 +292,22 @@ const calculateTotalIndividualCost = () => {
 
 const calculateTotalCommonAreaCost = () => {
     if (!mainReading.value?.cost || unitReadings.value.length === 0) return 0;
-    const totalIndividualCost = calculateTotalIndividualCost();
-    const remainingCost = mainReading.value.cost - totalIndividualCost;
-    return remainingCost / unitReadings.value.length; // Costo por unidad
+
+    // Calcular el costo total de áreas comunes basado en el consumo y el costo por m³
+    const commonAreaConsumption = calculateCommonAreaConsumption(); // en m³
+    const costPerUnit = calculateRate(); // S/ por m³
+    const totalCommonAreaCost = commonAreaConsumption * costPerUnit;
+
+    // Distribuir equitativamente entre todas las unidades
+    return totalCommonAreaCost / unitReadings.value.length;
 };
 
 
 const calculateTotalCommonAreaAmount = () => {
-    return unitReadings.value.reduce((sum, reading) => {
-        return sum + (reading.commonAreaCost || 0);
-    }, 0);
+    const rate = calculateRate();
+    const commonAreaConsumption = calculateCommonAreaConsumption();
+    const commonAreaCost = commonAreaConsumption * rate;
+    return commonAreaCost;
 };
 
 const calculateTotalCost = () => {
@@ -309,34 +316,50 @@ const calculateTotalCost = () => {
     return totalIndividual + totalCommon;
 };
 
+// Para mostrar las lecturas que ya vienen en m³ 
+const formatReadingMetros = (value) => {
+    if (value === null || value === undefined) return '-';
+    // Los valores ya están en m³, solo formatear
+    const numValue = Number(value);
+    return isNaN(numValue) ? '-' : numValue.toFixed(3);
+};
+
+// Calcular consumo (las lecturas ya están en m³)
+const calculateConsumption = (reading) => {
+    if (!reading.previousReading) return 0;
+    return reading.reading - reading.previousReading;
+};
+
+// Calcular consumo total (en m³)
+const calculateTotalConsumption = () => {
+    return unitReadings.value.reduce((sum, reading) => {
+        const consumption = calculateConsumption(reading);
+        return sum + consumption;
+    }, 0);
+};
+
+// Calcular consumo áreas comunes (en m³)
 const calculateCommonAreaConsumption = () => {
     if (!mainReading.value?.reading) return 0;
 
-    // La lectura total está en m³, multiplicamos por 1000 para convertir a litros
-    const lecturaTotalEnLitros = mainReading.value.reading * 1000;
+    // El volumen facturado ya viene en m³
+    const volumenFacturado = mainReading.value.reading;
     const consumoIndividual = calculateTotalConsumption();
 
-    console.log('Lectura Total (litros):', lecturaTotalEnLitros);
-    console.log('Consumo Individual (litros):', consumoIndividual);
-
-    const consumoAreasComunes = lecturaTotalEnLitros - consumoIndividual;
-    console.log('Consumo Áreas Comunes (litros):', consumoAreasComunes);
-
-    return consumoAreasComunes;
+    return volumenFacturado - consumoIndividual;
 };
 
+// Para el cálculo de porcentaje
 const calculateCommonAreaPercentage = () => {
     if (!mainReading.value?.reading) return 0;
 
-    // Convertir el área común a m³ para tener las mismas unidades
-    const commonArea = calculateCommonAreaConsumption() / 1000; // convertir de litros a m³
-    const total = mainReading.value.reading; // ya está en m³
+    const commonArea = calculateCommonAreaConsumption();
+    const total = mainReading.value.reading;
 
     if (total === 0) return 0;
-
-    // Calculamos el porcentaje
     return ((commonArea / total) * 100).toFixed(1);
 };
+
 // Cargar datos
 const loadReading = async () => {
     try {
@@ -471,24 +494,16 @@ const formatNumberOnly = (amount) => {
 const chartData = computed(() => {
     if (!mainReading.value || unitReadings.value.length === 0) return [];
 
-    // Consumo total (ya está en litros)
-    const totalConsumption = mainReading.value.reading * 1000;
-
-    // Preparar datos de unidades
+    // Preparar datos de unidades (consumos ya están en m³)
     const unitData = sortedUnitReadings.value.map(reading => ({
         name: getUnitName(reading.unitId),
-        value: calculateConsumption(reading) / 1000 // Convertir a m³
+        value: calculateConsumption(reading) // consumo ya está en m³
     }));
 
-    // Calcular áreas comunes como la diferencia entre el total y la suma de unidades
-    const individualTotal = sortedUnitReadings.value.reduce(
-        (sum, reading) => sum + calculateConsumption(reading),
-        0
-    );
-
+    // El área común también ya está en m³
     const commonArea = {
         name: 'Áreas Comunes',
-        value: (totalConsumption - individualTotal) / 1000 // Convertir a m³
+        value: calculateCommonAreaConsumption()
     };
 
     return [...unitData, commonArea];
