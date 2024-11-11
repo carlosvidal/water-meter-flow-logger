@@ -10,7 +10,6 @@ import Units from "../views/Units.vue";
 import MeterReadings from "../views/MeterReadings.vue";
 import Reports from "../views/Reports.vue";
 import CreateUnit from "../views/CreateUnit.vue";
-import CreateMeterReading from "../views/CreateMeterReading.vue";
 import CreateUser from "../views/CreateUser.vue";
 import CreateCondo from "@/views/CreateCondo.vue";
 import RegisterInvitation from "../views/RegisterInvitation.vue";

@@ -6,7 +6,7 @@
                 <!-- Logo -->
                 <div class="flex-shrink-0 flex items-center">
                     <router-link to="/">
-                        <img class="h-8 w-auto" src="https://via.placeholder.com/200x70?text=Logo" alt="Logo">
+                        <img class="h-8 w-auto" src="@/assets/condoflows-logo.svg" alt="Condoflows.com">
                     </router-link>
                 </div>
 

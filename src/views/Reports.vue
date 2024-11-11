@@ -5,7 +5,7 @@
             <thead>
                 <tr>
                     <th>Unidad</th>
-                    <th>Arrendatario</th>
+                    <th>Residente</th>
                     <th>Consumo Total (m³)</th>
                     <th>Costo Total</th>
                 </tr>

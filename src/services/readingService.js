@@ -4,15 +4,20 @@ import {
   collection,
   addDoc,
   updateDoc,
+  setDoc,
   doc,
   query,
   where,
   orderBy,
   getDoc,
   getDocs,
+  runTransaction,
   limit,
+  writeBatch,
   serverTimestamp,
 } from "firebase/firestore";
+import { unitHistoryService } from "./unitHistoryService";
+import { condoHistoryService } from "./condoHistoryService";
 
 export const readingService = {
   // Obtener unidades de un condominio
@@ -153,7 +158,6 @@ export const readingService = {
     }
   },
 
-  // readingService.js
   async createMainReading(readingData) {
     try {
       console.log("=== INICIO DE CREACIÓN DE LECTURA ===");
@@ -193,17 +197,184 @@ export const readingService = {
         throw new Error("No hay lecturas individuales registradas");
       }
 
-      // Crear el documento
+      // Crear el documento de lectura
       const docRef = await addDoc(collection(db, "meter-readings"), {
         ...readingData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
-      console.log("Lectura creada exitosamente con ID:", docRef.id);
+      // Crear/actualizar documentos de historial usando mapas
+      const batch = writeBatch(db);
+      const unitIds = Object.keys(readingData.unitReadings);
+
+      for (const unitId of unitIds) {
+        const unitHistoryRef = doc(db, "unit-history", unitId);
+        batch.set(
+          unitHistoryRef,
+          {
+            [`readings.${docRef.id}`]: {
+              status: "pending",
+              createdAt: serverTimestamp(),
+            },
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+
+      await batch.commit();
+      console.log("Lectura y historiales creados exitosamente");
+
       return docRef.id;
     } catch (error) {
       console.error("Error en createMainReading:", error);
+      throw error;
+    }
+  },
+
+  async closeReading(readingId) {
+    console.log("====== INICIANDO CIERRE DE LECTURA ======");
+
+    try {
+      const readingRef = doc(db, "meter-readings", readingId);
+      const readingSnapshot = await getDoc(readingRef);
+
+      if (!readingSnapshot.exists()) {
+        throw new Error("Lectura no encontrada");
+      }
+
+      const readingData = readingSnapshot.data();
+      console.log("Datos actuales de lectura:", readingData);
+
+      if (readingData.status === "closed") {
+        throw new Error("La lectura ya está cerrada");
+      }
+
+      // Obtener lecturas anteriores
+      const previousReadings = await this.getPreviousReadings(
+        readingData.condoId
+      );
+      console.log("Lecturas anteriores:", previousReadings);
+
+      // Preparar todos los cálculos
+      const processedReadings = {};
+      let totalUnitConsumption = 0;
+
+      // Calcular consumos
+      for (const [unitId, unitData] of Object.entries(
+        readingData.unitReadings
+      )) {
+        const currentReading = Number(unitData.reading || unitData);
+        const previousReading = Number(previousReadings[unitId] || 0);
+        const consumption = currentReading - previousReading;
+
+        totalUnitConsumption += consumption;
+        processedReadings[unitId] = {
+          reading: currentReading,
+          previousReading: previousReading,
+          consumption: consumption,
+        };
+      }
+
+      // Calcular costos
+      const totalReading = Number(readingData.reading);
+      const totalCost = Number(readingData.cost);
+      const commonAreaConsumption = Math.max(
+        0,
+        totalReading - totalUnitConsumption
+      );
+      const costPerUnit = totalCost / totalReading;
+      const commonAreaCostPerUnit =
+        (commonAreaConsumption * costPerUnit) /
+        Object.keys(processedReadings).length;
+
+      // Preparar las actualizaciones
+      const batch = writeBatch(db);
+
+      // Actualizar los documentos de historial de cada unidad
+      for (const [unitId, unitData] of Object.entries(processedReadings)) {
+        const individualCost = Number(
+          (unitData.consumption * costPerUnit).toFixed(2)
+        );
+        const commonAreaCost = Number(commonAreaCostPerUnit.toFixed(2));
+        const totalUnitCost = Number(
+          (individualCost + commonAreaCost).toFixed(2)
+        );
+
+        // Actualizar datos en processedReadings para la lectura principal
+        processedReadings[unitId] = {
+          ...unitData,
+          individualCost,
+          commonAreaCost,
+          totalCost: totalUnitCost,
+        };
+
+        // Actualizar historial usando el mapa
+        const unitHistoryRef = doc(db, "unit-history", unitId);
+        batch.update(unitHistoryRef, {
+          [`readings.${readingId}`]: {
+            date: readingData.date,
+            reading: unitData.reading,
+            previousReading: unitData.previousReading,
+            consumption: unitData.consumption,
+            individualCost,
+            commonAreaCost,
+            totalCost: totalUnitCost,
+            updatedAt: serverTimestamp(),
+            status: "completed",
+          },
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      // Preparar datos actualizados de la lectura principal
+      const updatedReadingData = {
+        unitReadings: processedReadings,
+        commonAreaConsumption,
+        commonAreaCostPerUnit,
+        costPerUnit,
+        totalUnitConsumption,
+        status: "closed",
+        closedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        calculations: {
+          completed: true,
+          timestamp: serverTimestamp(),
+        },
+      };
+
+      // Actualizar la lectura principal
+      batch.update(readingRef, updatedReadingData);
+
+      // Actualizar el historial del condominio
+      await condoHistoryService.updateHistoryFromReading(readingId, {
+        ...readingData,
+        ...updatedReadingData,
+        unitReadings: processedReadings,
+      });
+
+      // Ejecutar todas las actualizaciones
+      await batch.commit();
+
+      console.log("====== CIERRE DE LECTURA COMPLETADO CON ÉXITO ======");
+      return { success: true, readingId };
+    } catch (error) {
+      console.error("Error en closeReading:", error);
+      // Revertir estado
+      try {
+        await setDoc(
+          doc(db, "meter-readings", readingId),
+          {
+            status: "open",
+            error: error.message,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (rollbackError) {
+        console.error("Error en rollback:", rollbackError);
+      }
       throw error;
     }
   },
@@ -228,121 +399,102 @@ export const readingService = {
     }
   },
 
-  // Cerrar lectura
-  // En readingService.js
-
-  async closeReading(readingId) {
+  // Método de utilidad para verificar el estado del historial
+  async verifyUnitHistory(readingId) {
     try {
-      const docRef = doc(db, "meter-readings", readingId);
-      const readingSnap = await getDoc(docRef);
-
-      if (!readingSnap.exists()) {
+      const reading = await getDoc(doc(db, "meter-readings", readingId));
+      if (!reading.exists()) {
         throw new Error("Lectura no encontrada");
       }
 
-      const readingData = readingSnap.data();
+      const readingData = reading.data();
+      console.log("Datos de lectura principal:", readingData);
 
-      // Validaciones
-      if (readingData.status === "closed") {
-        throw new Error("La lectura ya está cerrada");
+      for (const unitId of Object.keys(readingData.unitReadings)) {
+        const historyPath = `unit-history/${unitId}/readings/${readingId}`;
+        const historyDoc = await getDoc(doc(db, historyPath));
+
+        console.log(`Estado del historial para unidad ${unitId}:`, {
+          path: historyPath,
+          exists: historyDoc.exists(),
+          data: historyDoc.data(),
+        });
+      }
+    } catch (error) {
+      console.error("Error en verificación:", error);
+      throw error;
+    }
+  },
+
+  async verifyReadingStructure(readingId) {
+    try {
+      console.log("=== INICIANDO VERIFICACIÓN DE ESTRUCTURA ===");
+
+      // Obtener la lectura principal
+      const mainReadingRef = doc(db, "meter-readings", readingId);
+      const mainReadingDoc = await getDoc(mainReadingRef);
+
+      if (!mainReadingDoc.exists()) {
+        throw new Error(`Lectura ${readingId} no encontrada`);
       }
 
-      if (
-        !readingData.reading ||
-        !readingData.cost ||
-        !readingData.unitReadings
-      ) {
-        throw new Error("Faltan datos requeridos para cerrar la lectura");
-      }
-
-      // Procesar lecturas individuales
-      const processedReadings = {};
-      let totalUnitConsumption = 0;
-
-      // Primero obtenemos las lecturas anteriores
-      const previousReadings = await this.getPreviousReadings(
-        readingData.condoId
-      );
-
-      // Procesamos cada lectura
-      for (const [unitId, unitData] of Object.entries(
-        readingData.unitReadings
-      )) {
-        const currentReading = Number(unitData.reading || unitData);
-        const previousReading = Number(previousReadings[unitId] || 0);
-        const consumption = currentReading - previousReading;
-
-        if (isNaN(currentReading) || isNaN(previousReading)) {
-          throw new Error(`Lecturas inválidas para la unidad ${unitId}`);
-        }
-
-        totalUnitConsumption += consumption;
-
-        processedReadings[unitId] = {
-          reading: currentReading,
-          previousReading: previousReading,
-          consumption: consumption,
-        };
-      }
-
-      const totalReading = Number(readingData.reading);
-      const totalCost = Number(readingData.cost);
-
-      if (isNaN(totalReading) || isNaN(totalCost)) {
-        throw new Error("Lectura total o costo total inválidos");
-      }
-
-      // Calcular áreas comunes
-      const commonAreaConsumption = Math.max(
-        0,
-        totalReading - totalUnitConsumption
-      );
-      const costPerUnit = totalCost / totalReading;
-      const commonAreaCostPerUnit =
-        (commonAreaConsumption * costPerUnit) /
-        Object.keys(processedReadings).length;
-
-      // Calcular costos individuales
-      for (const unitId in processedReadings) {
-        const unitData = processedReadings[unitId];
-        unitData.individualCost = Number(
-          (unitData.consumption * costPerUnit).toFixed(2)
-        );
-        unitData.commonAreaCost = Number(commonAreaCostPerUnit.toFixed(2));
-        unitData.totalCost = Number(
-          (unitData.individualCost + unitData.commonAreaCost).toFixed(2)
-        );
-      }
-
-      const summary = {
-        totalReading,
-        totalCost,
-        totalUnitConsumption,
-        commonAreaConsumption,
-        commonAreaCostPerUnit: Number(commonAreaCostPerUnit.toFixed(2)),
-        costPerUnit: Number(costPerUnit.toFixed(2)),
-      };
-
-      // Actualizar documento
-      await updateDoc(docRef, {
-        status: "closed",
-        unitReadings: processedReadings,
-        commonAreaConsumption,
-        commonAreaCostPerUnit,
-        costPerUnit,
-        totalUnitConsumption,
-        closedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        summary,
+      const mainReading = mainReadingDoc.data();
+      console.log("Lectura principal:", {
+        id: readingId,
+        data: mainReading,
       });
 
-      return {
-        id: readingId,
-        processedReadings,
-        summary,
-      };
+      // Verificar cada unidad
+      const unitIds = Object.keys(mainReading.unitReadings || {});
+      console.log(`Verificando ${unitIds.length} unidades...`);
+
+      for (const unitId of unitIds) {
+        const path = `unit-history/${unitId}/readings/${readingId}`;
+        const historyDoc = await getDoc(doc(db, path));
+
+        console.log(`\nUnidad ${unitId}:`);
+        console.log("Ruta:", path);
+        console.log("Existe:", historyDoc.exists());
+
+        if (historyDoc.exists()) {
+          const data = historyDoc.data();
+          console.log("Datos:", {
+            date: data.date,
+            reading: data.reading,
+            previousReading: data.previousReading,
+            consumption: data.consumption,
+            individualCost: data.individualCost,
+            commonAreaCost: data.commonAreaCost,
+            totalCost: data.totalCost,
+            createdAt: data.createdAt,
+          });
+
+          // Verificar campos requeridos
+          const requiredFields = [
+            "date",
+            "reading",
+            "previousReading",
+            "consumption",
+            "individualCost",
+            "commonAreaCost",
+            "totalCost",
+            "createdAt",
+          ];
+
+          const missingFields = requiredFields.filter((field) => !data[field]);
+          if (missingFields.length > 0) {
+            console.error("⚠️ Campos faltantes:", missingFields.join(", "));
+          } else {
+            console.log("✅ Todos los campos requeridos están presentes");
+          }
+        } else {
+          console.error("❌ Documento de historial no encontrado");
+        }
+      }
+
+      console.log("\n=== VERIFICACIÓN COMPLETADA ===");
     } catch (error) {
-      console.error("Error closing reading:", error);
+      console.error("Error en verificación:", error);
       throw error;
     }
   },

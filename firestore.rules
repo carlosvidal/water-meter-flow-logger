@@ -17,6 +17,7 @@ service cloud.firestore {
     function isEditor() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.baseRole == 'editor';
     }
+    
     // Verifica si el usuario es admin de un condominio específico
     function isCondoAdmin(condoId) {
       return exists(/databases/$(database)/documents/userRoles/$(request.auth.uid))
@@ -27,6 +28,22 @@ service cloud.firestore {
     function canManageReadings() {
       return isAuthenticated() && (isSuperAdmin() || isAdmin() || isEditor());
     }
+
+   match /unit-history/{unitId} {
+      allow read: if isAuthenticated();
+      allow write: if canManageReadings();
+      
+      match /readings/{readingId} {
+        allow read: if isAuthenticated();
+        allow write: if canManageReadings();
+      }
+    }
+
+    match /unit-history/{unitId}/readings/{readingId} {
+      allow read: if isAuthenticated();
+      allow write, create, update: if canManageReadings();
+    }
+
     // Reglas para la colección meter-readings
     match /meter-readings/{readingId} {
       allow read: if isAuthenticated();
@@ -74,6 +91,16 @@ service cloud.firestore {
     match /units/{unitId} {
       allow read: if isAuthenticated();
       allow write: if isSuperAdmin() || isCondoAdmin(resource.data.condoId);
+    }
+
+    // Reglas para condo-history
+    match /condo-history/{condoId} {
+      // Permitir lectura a usuarios con permiso de gestión de lecturas
+      allow read: if canManageReadings();
+      
+      // Permitir todas las operaciones de escritura si puede gestionar lecturas
+      // Esto incluye create, update y delete
+      allow write: if canManageReadings();
     }
   }
 }

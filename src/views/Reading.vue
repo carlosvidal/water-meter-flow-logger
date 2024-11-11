@@ -530,6 +530,16 @@ const consumptionChartData = computed(() => {
     return individualData;
 });
 
+import { readingService } from '../services/readingService';
+
+const checkStructure = async () => {
+    try {
+        await readingService.verifyReadingStructure(readingId);
+    } catch (error) {
+        console.error('Error:', error);
+    }
+};
+
 onMounted(() => {
     loadReading();
 });

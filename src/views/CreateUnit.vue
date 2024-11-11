@@ -26,7 +26,7 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                        Nombre del arrendatario *
+                        Nombre del residente *
                     </label>
                     <input type="text" v-model="tenantName" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 
                                dark:bg-gray-700 dark:text-white
@@ -35,7 +35,7 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                        Email del arrendatario *
+                        Email del residente *
                     </label>
                     <input type="email" v-model="tenantEmail" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 
                                dark:bg-gray-700 dark:text-white
@@ -44,7 +44,7 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                        Teléfono del arrendatario *
+                        Teléfono del residente *
                     </label>
                     <vue-tel-input v-model="phoneNumber" @validate="handlePhoneValidation"
                         class="mt-1 dark-mode-phone"></vue-tel-input>

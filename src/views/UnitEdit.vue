@@ -43,26 +43,26 @@
                         </div>
                     </div>
 
-                    <!-- Información del arrendatario -->
+                    <!-- Información del residente -->
                     <div class="space-y-6">
-                        <h3 class="text-lg font-medium text-gray-900">Información del Arrendatario</h3>
+                        <h3 class="text-lg font-medium text-gray-900">Información del Residente</h3>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">
-                                Nombre del arrendatario *
+                                Nombre del residente *
                             </label>
                             <input type="text" v-model="form.tenant.name" required
                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">
-                                Email del arrendatario *
+                                Email del residente *
                             </label>
                             <input type="email" v-model="form.tenant.email" required
                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">
-                                Teléfono del arrendatario *
+                                Teléfono del residente *
                             </label>
                             <vue-tel-input v-model="form.tenant.phone" @validate="handlePhoneValidation"
                                 class="mt-1 dark-mode-phone"></vue-tel-input>

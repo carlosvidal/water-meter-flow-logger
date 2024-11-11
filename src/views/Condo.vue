@@ -41,7 +41,7 @@
                                     </th>
                                     <th
                                         class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Arrendatario
+                                        Residente
                                     </th>
                                     <th
                                         class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -92,6 +92,106 @@
                 </div>
             </div>
 
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Tarjeta de Consumo Promedio -->
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Consumo Promedio</h3>
+                    <div class="text-3xl font-bold text-blue-600">
+                        {{ condoStats ? formatNumber(condoStats.averageConsumption) : '0' }} m³
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Promedio mensual</p>
+                </div>
+
+                <!-- Tarjeta de Último Consumo -->
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Último Consumo</h3>
+                    <div class="text-3xl font-bold text-green-600">
+                        {{ condoStats?.lastReading ? formatNumber(condoStats.lastReading.totalConsumption) : '0' }} m³
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">
+                        {{ condoStats?.lastReading ? formatDate(condoStats.lastReading.date) : 'Sin lecturas' }}
+                    </p>
+                </div>
+
+                <!-- Tarjeta de Costo Promedio -->
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Costo Promedio</h3>
+                    <div class="text-3xl font-bold text-indigo-600">
+                        S/. {{ condoStats ? formatNumber(condoStats.averageCost) : '0' }}
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Promedio mensual</p>
+                </div>
+            </div>
+
+            <!-- Gráficos -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Gráfico de Consumo -->
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Tendencia de Consumo</h3>
+                    <div class="h-64">
+                        <Line v-if="consumptionChartData" :data="consumptionChartData" :options="chartOptions" />
+                    </div>
+                </div>
+
+                <!-- Gráfico de Costos -->
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Tendencia de Costos</h3>
+                    <div class="h-64">
+                        <Line v-if="costChartData" :data="costChartData" :options="chartOptions" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de Historial -->
+            <div class="bg-white shadow rounded-lg overflow-hidden">
+                <div class="px-4 py-5 sm:px-6">
+                    <h2 class="text-lg font-medium">Historial de Lecturas</h2>
+                </div>
+                <div class="border-t border-gray-200">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Fecha
+                                    </th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Consumo Total
+                                    </th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Áreas Comunes
+                                    </th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Costo Total
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr v-for="reading in sortedHistoricalReadings" :key="reading.date"
+                                    class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {{ formatDate(reading.date) }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {{ formatNumber(reading.totalConsumption) }} m³
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {{ formatNumber(reading.commonAreaConsumption) }} m³
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        S/. {{ formatNumber(reading.totalCost) }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- Botón FAB -->
             <button v-if="canAddUnits" @click="goToCreateUnit"
                 class="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
@@ -109,6 +209,12 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { db } from '../firebase';
 import { doc, getDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { Line } from 'vue-chartjs';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+import { condoHistoryService } from '../services/condoHistoryService';
+
+// Registrar Chart.js
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 const route = useRoute();
 const router = useRouter();
@@ -116,6 +222,8 @@ const condoId = route.params.id;
 const condo = ref(null);
 const unitsDetails = ref({});
 const isActive = ref(false);
+const condoStats = ref(null);
+const isLoadingStats = ref(false);
 
 // Computed property para ordenar las unidades
 const sortedUnits = computed(() => {
@@ -196,7 +304,103 @@ const goToCreateUnit = () => {
     });
 };
 
-onMounted(() => {
-    fetchCondo();
+const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            position: 'top'
+        }
+    },
+    scales: {
+        y: {
+            beginAtZero: true
+        }
+    }
+};
+
+// Computed properties para los gráficos
+const consumptionChartData = computed(() => {
+    if (!condoStats.value?.consumptionTrend) return null;
+
+    return {
+        labels: condoStats.value.consumptionTrend.map(item =>
+            new Date(item.date).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+        ),
+        datasets: [
+            {
+                label: 'Consumo Total (m³)',
+                data: condoStats.value.consumptionTrend.map(item => item.consumption),
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                fill: true
+            },
+            {
+                label: 'Áreas Comunes (m³)',
+                data: condoStats.value.consumptionTrend.map(item => item.commonArea),
+                borderColor: '#059669',
+                backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                fill: true
+            }
+        ]
+    };
+});
+
+const costChartData = computed(() => {
+    if (!condoStats.value?.consumptionTrend) return null;
+
+    return {
+        labels: condoStats.value.consumptionTrend.map(item =>
+            new Date(item.date).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+        ),
+        datasets: [
+            {
+                label: 'Costo Total (S/.)',
+                data: condoStats.value.consumptionTrend.map(item => item.cost),
+                borderColor: '#7c3aed',
+                backgroundColor: 'rgba(124, 58, 237, 0.1)',
+                fill: true
+            }
+        ]
+    };
+});
+
+const sortedHistoricalReadings = computed(() => {
+    if (!condoStats.value?.consumptionTrend) return [];
+    return [...condoStats.value.consumptionTrend].sort((a, b) =>
+        new Date(b.date) - new Date(a.date)
+    );
+});
+
+// Funciones de utilidad
+const formatNumber = (value) => {
+    return value ? Number(value).toFixed(2) : '0.00';
+};
+
+const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+};
+
+// Función para cargar las estadísticas
+const loadCondoStats = async () => {
+    try {
+        isLoadingStats.value = true;
+        const stats = await condoHistoryService.getCondoStats(condoId);
+        condoStats.value = stats;
+    } catch (error) {
+        console.error('Error cargando estadísticas:', error);
+    } finally {
+        isLoadingStats.value = false;
+    }
+};
+
+// Modificamos onMounted para que sea async
+onMounted(async () => {
+    await fetchCondo();
+    await loadCondoStats();
 });
 </script>
