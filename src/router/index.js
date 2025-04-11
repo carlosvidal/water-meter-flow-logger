@@ -53,6 +53,14 @@ const routes = [
     },
   },
   {
+    path: "/condo/:id/edit",
+    component: () => import("@/views/EditCondo.vue"),
+    meta: {
+      requiresAuth: true,
+      allowedUserTypes: ["superadmin"],
+    },
+  },
+  {
     path: "/units",
     component: Units,
     meta: {

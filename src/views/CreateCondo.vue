@@ -37,29 +37,36 @@
                             <input type="number" v-model="formData.numberOfUnits" required min="1"
                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                 placeholder="Ej: 20" />
-                            <p class="mt-1 text-sm text-gray-500">
-                                Ingrese el número total de unidades del condominio
-                            </p>
                         </div>
+                    </div>
+                </div>
 
-                        <div>
-                            <label class="flex items-center">
-                                <input type="checkbox" v-model="formData.isActive"
-                                    class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-                                <span class="ml-2 text-sm text-gray-600">Condominio Activo</span>
-                            </label>
-                        </div>
+                <!-- Dirección y Localización -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Dirección y Localización</h2>
+                    <AddressInput v-model="formData.address" />
+                </div>
+
+                <!-- Configuración -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Configuración</h2>
+                    <div>
+                        <label class="flex items-center">
+                            <input type="checkbox" v-model="formData.isActive"
+                                class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                            <span class="ml-2 text-sm text-gray-600">Condominio Activo</span>
+                        </label>
                     </div>
                 </div>
 
                 <!-- Botones de acción -->
                 <div class="flex justify-end space-x-3">
                     <button type="button" @click="router.push('/condos')"
-                        class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                         Cancelar
                     </button>
                     <button type="submit" :disabled="isSubmitting"
-                        class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300">
+                        class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300">
                         {{ isSubmitting ? 'Guardando...' : 'Crear Condominio' }}
                     </button>
                 </div>
@@ -74,6 +81,7 @@ import { useRouter } from 'vue-router';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useUserStore } from '../store/user';
+import AddressInput from '@/components/AddressInput.vue';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -84,17 +92,26 @@ const formData = ref({
     name: '',
     numberOfUnits: null,
     isActive: true,
+    address: {
+        country: '',
+        state: '',
+        city: '',
+        street: '',
+        postalCode: '',
+        timezone: '',
+        currency: '',
+        language: ''
+    }
 });
 
 // Validación de permisos al montar el componente
 onMounted(() => {
     if (!userStore.isSuperAdmin) {
-        router.push('/'); // Redirigir si no es superadmin
+        router.push('/');
     }
 });
 
 const createCondo = async () => {
-    // Validar que sea superadmin
     if (!userStore.isSuperAdmin) {
         error.value = 'No tiene permisos para crear condominios';
         return;
@@ -111,24 +128,26 @@ const createCondo = async () => {
         return;
     }
 
+    if (!formData.value.address.country || !formData.value.address.city || !formData.value.address.street) {
+        error.value = 'La dirección es requerida';
+        return;
+    }
+
     try {
         isSubmitting.value = true;
         error.value = '';
 
-        // Preparar datos del condominio
         const condoData = {
             name: formData.value.name.trim(),
             numberOfUnits: parseInt(formData.value.numberOfUnits),
             isActive: formData.value.isActive,
+            address: formData.value.address,
             adminId: userStore.currentUser?.uid,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         };
 
-        // Crear el condominio en Firestore
         await addDoc(collection(db, 'condos'), condoData);
-
-        // Redirigir al listado de condominios
         router.push('/condos');
     } catch (err) {
         console.error("Error creando el condominio:", err);
